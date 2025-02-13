@@ -6,8 +6,18 @@ authors = [{ name = "jayseregon", email = "jayseregon@gmail.com" }]
 license = { text = "LGPL-3.0-or-later" }
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = ["fastapi[standard] (>=0.115.8,<0.116.0)", "ipykernel (>=6.29.5,<7.0.0)"]
-
+dependencies = [
+    "fastapi[standard]",
+    "transformers",
+    "ipykernel",
+    "torch",
+    "scikit-learn",
+    "matplotlib",
+    "pandas",
+    "numpy",
+    "sentence-transformers",
+    "pydantic",
+]
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
