@@ -1,0 +1,76 @@
+[project]
+name = "fastapi-ai-tools"
+version = "0.1.0"
+description = "AI & RAG backend tools"
+authors = [{ name = "jayseregon", email = "jayseregon@gmail.com" }]
+license = { text = "LGPL-3.0-or-later" }
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi[standard]",
+    "transformers",
+    "ipykernel",
+    "torch",
+    "scikit-learn",
+    "matplotlib",
+    "pandas",
+    "numpy",
+    "sentence-transformers",
+    "pydantic",
+    "pytest",
+]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+
+[tool.poetry]
+package-mode = false
+
+[tool.isort]
+profile = "black"
+
+[tool.black]
+target-version = ["py313"]
+
+[tool.ruff]
+# Enable Pyflakes `E` and `F` codes by default.
+lint.select = ["E", "F"]
+lint.ignore = ["E501", "E741", "E402", "F403", "E722", "F405"]
+
+# Allow autofix for all enabled rules (when `--fix`) is provided.
+lint.fixable = ["ALL"]
+lint.unfixable = []
+
+# Exclude a variety of commonly ignored directories.
+lint.exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+]
+
+# Same as Black.
+line-length = 88
+
+[tool.ruff.lint.mccabe]
+# Unlike Flake8, default to a complexity level of 10.
+max-complexity = 10
