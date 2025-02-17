@@ -20,8 +20,15 @@ class EmbeddingService:
         self, embeddings: np.ndarray, n_components: int = 2
     ) -> np.ndarray:
         """Reduce dimensionality using PCA."""
-        pca = PCA(n_components=n_components)
-        return pca.fit_transform(embeddings)
+        if len(embeddings) == 1:
+            # For single word, return a point at origin
+            return np.zeros((1, 2))
+        elif len(embeddings) == 2:
+            # For two words, use a line
+            return np.array([[0, 0], [1, 0]])
+        else:
+            pca = PCA(n_components=n_components)
+            return pca.fit_transform(embeddings)
 
     def get_normalized_list(
         self, embeddings: np.ndarray, value_range: Tuple[float, float] = (0, 1)
@@ -44,7 +51,25 @@ class EmbeddingService:
 
     def process_keywords(self, keywords: List[str]) -> Embeddings:
         """Generate embeddings from keywords and structure them in the Embeddings schema."""
-        embeddings = self.create_embeddings(keywords)
+        if not keywords:
+            return Embeddings(keywords=[])
+
+        unique_keywords = list(dict.fromkeys(keywords))  # Preserve order
+        embeddings = self.create_embeddings(unique_keywords)
         reduced = self.reduce_dimensions(embeddings)
         normalized = self.get_normalized_list(reduced)
-        return self.get_embeddings(normalized, keywords)
+
+        # Create mapping for duplicate keywords
+        embedding_map = {
+            word: coords for word, coords in zip(unique_keywords, normalized)
+        }
+
+        # Return embeddings maintaining original order and duplicates
+        return Embeddings(
+            keywords=[
+                EmbeddedKeyword(
+                    word=word, x=embedding_map[word][0], y=embedding_map[word][1]
+                )
+                for word in keywords
+            ]
+        )

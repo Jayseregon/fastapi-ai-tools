@@ -14,7 +14,7 @@ def get_embedding_service() -> EmbeddingService:
     return EmbeddingService()
 
 
-@router.post("/keywords", response_model=Embeddings)
+@router.post("/keywords", response_model=Embeddings, status_code=201)
 async def create_embeddings(
     keywords: Keywords,
     embedding_service: EmbeddingService = Depends(get_embedding_service),
