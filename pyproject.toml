@@ -17,6 +17,7 @@ dependencies = [
     "numpy",
     "sentence-transformers",
     "pydantic",
+    "pytest (>=8.3.4,<9.0.0)",
 ]
 
 [build-system]
