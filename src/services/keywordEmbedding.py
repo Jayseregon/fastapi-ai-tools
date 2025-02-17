@@ -5,7 +5,7 @@ from sentence_transformers import SentenceTransformer
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import MinMaxScaler
 
-from ..models.models import EmbeddedKeyword, Embeddings
+from src.models.models import EmbeddedKeyword, Embeddings
 
 
 class EmbeddingService:

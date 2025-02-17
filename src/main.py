@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
-from .models.models import Keywords
-from .services.keywordEmbedding import Embeddings, EmbeddingService
+from src.models.models import Keywords
+from src.services.keywordEmbedding import Embeddings, EmbeddingService
 
 app = FastAPI()
 
