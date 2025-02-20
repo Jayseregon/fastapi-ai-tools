@@ -2,11 +2,18 @@ import logging
 from contextlib import asynccontextmanager
 
 from asgi_correlation_id import CorrelationIdMiddleware
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.exception_handlers import http_exception_handler
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.security import OAuth2PasswordBearer
 
-from src.logging_conf import configure_logging
-from src.routes.embeddingRouter import router as embedding_router
+from src.configs.env_config import config
+from src.configs.log_config import configure_logging
+from src.models.user import User
+from src.routes.embedding import router as embedding_router
+from src.security.jwt_auth import validate_token
 
 logger = logging.getLogger(__name__)
 
@@ -18,12 +25,31 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=config.get_allowed_hosts)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=config.get_allowed_hosts,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+if config.ENV_STATE == "prod":
+    app.add_middleware(HTTPSRedirectMiddleware)
 app.add_middleware(CorrelationIdMiddleware)
+
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
 @app.get("/")
 async def read_root():
+    logger.debug({"Origins": config.get_allowed_hosts})
     return {"greatings": "Welcome to the keyword embeddings API!"}
+
+
+@app.get("/users/me")
+async def read_users_me(current_user: User = Depends(validate_token)):
+    return current_user
 
 
 app.include_router(embedding_router)

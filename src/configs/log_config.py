@@ -1,6 +1,6 @@
 from logging.config import dictConfig
 
-from src.config import DevConfig, config
+from src.configs.env_config import DevConfig, config
 
 # uncomment conditional logic to enable log to file
 
@@ -53,7 +53,7 @@ def configure_logging() -> None:
             },
             "loggers": {
                 "uvicorn": {"handlers": ["default"], "level": "INFO"},
-                "fastapi-ai-tools": {
+                "src": {
                     "handlers": handlers,
                     "level": "DEBUG" if isinstance(config, DevConfig) else "INFO",
                     "propagate": False,

@@ -1,0 +1,26 @@
+services:
+  # fastapi-postgres:
+  #   restart: always
+  #   image: postgres:13
+  #   container_name: ƒastapi-dev-resources
+  #   volumes:
+  #     - postgres-fastapi-data:/var/lib/postgresql/data/
+  #   environment:
+  #     - POSTGRES_USER=dev_docker_fastapi_user
+  #     - POSTGRES_PASSWORD=dev_docker_fastapi_pwd
+  #     - POSTGRES_DB=dev_docker_fastapi_db
+  #   env_file:
+  #     - .env
+  #   ports:
+  #     - 5432:5432
+
+  fastapi-redis:
+    image: redis:latest
+    container_name: dev-fastapi-redis
+    env_file:
+      - .env
+    ports:
+      - 6379:6379
+
+# volumes:
+#   postgres-fastapi-data:
