@@ -33,8 +33,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 if config.ENV_STATE == "prod":
     app.add_middleware(HTTPSRedirectMiddleware)
+
 app.add_middleware(CorrelationIdMiddleware)
 
 

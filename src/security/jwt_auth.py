@@ -117,10 +117,10 @@ async def validate_token(token: str = Depends(oauth2_scheme)) -> User:
             issued_at=payload.get("iat"),
             expires_at=payload.get("exp"),
         )
-    except JWTError as e:
+    except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Could not validate credentials: {str(e)}",
+            detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
     except Exception:
