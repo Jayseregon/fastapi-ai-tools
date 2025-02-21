@@ -1,3 +1,27 @@
+# ----------------------------------------------------------------------
+# Portions of this code are derived from fastapi-limiter
+# (https://github.com/long2ice/fastapi-limiter.git) which is licensed
+# under the Apache License, Version 2.0.
+#
+# Modifications Copyright (C) Jayseregon, 2025.
+#
+# This file is part of fastapi-ai-tools which is licensed under LGPL-3.0-or-later.
+#
+# Licensed under the Apache License, Version 2.0 (for fastapi-limiter derived parts)
+# and under LGPL-3.0-or-later for the overall project.
+# You may obtain a copy of the Apache License at:
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+# ----------------------------------------------------------------------
+
+__all__ = [
+    "FastAPILimiter",
+    "default_identifier",
+    "http_default_callback",
+    "ws_default_callback",
+]
+
+import logging
 from math import ceil
 from typing import Callable, Optional, Union
 
@@ -7,13 +31,15 @@ from starlette.responses import Response
 from starlette.status import HTTP_429_TOO_MANY_REQUESTS
 from starlette.websockets import WebSocket
 
+logger = logging.getLogger(__name__)
+
 
 async def default_identifier(request: Union[Request, WebSocket]):
     forwarded = request.headers.get("X-Forwarded-For")
     if forwarded:
         ip = forwarded.split(",")[0]
     else:
-        ip = request.client.host
+        ip = request.client.host if request.client else "unknown"
     return ip + ":" + request.scope["path"]
 
 
@@ -35,17 +61,16 @@ async def http_default_callback(request: Request, response: Response, pexpire: i
 
 async def ws_default_callback(ws: WebSocket, pexpire: int):
     """
-    default callback when too many requests
-    :param ws:
-    :param pexpire: The remaining milliseconds
-    :return:
+    Default callback when too many websocket requests.
+    Instead of throwing an HTTPException, close the WebSocket.
     """
     expire = ceil(pexpire / 1000)
-    raise HTTPException(
-        HTTP_429_TOO_MANY_REQUESTS,
-        "Too Many Requests",
-        headers={"Retry-After": str(expire)},
+    logger.warning(
+        "WebSocket rate limit exceeded, closing connection. Retry-After: %s seconds",
+        expire,
     )
+    # close with a status indicating service unavailability
+    await ws.close(code=1013)
 
 
 class FastAPILimiter:
@@ -86,8 +111,13 @@ end"""
         cls.identifier = identifier
         cls.http_callback = http_callback
         cls.ws_callback = ws_callback
-        cls.lua_sha = await redis.script_load(cls.lua_script)
+        try:
+            cls.lua_sha = await redis.script_load(cls.lua_script)
+        except Exception as e:
+            logger.error("Error loading Lua script: %s", e)
+            raise
 
     @classmethod
     async def close(cls) -> None:
-        await cls.redis.close()
+        if cls.redis:
+            await cls.redis.close()
