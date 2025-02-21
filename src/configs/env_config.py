@@ -17,6 +17,7 @@ class GlobalConfig(BaseConfig):
     SECRET_KEY: Optional[str] = None
     ALLOWED_ISSUERS: str = ""
     ALLOWED_HOSTS: str = ""
+    REDIS_URL: Optional[str] = None
 
     @property
     def get_allowed_issuers(self) -> list[str]:

@@ -1,6 +1,7 @@
 import logging
 from contextlib import asynccontextmanager
 
+import redis.asyncio as redis
 from asgi_correlation_id import CorrelationIdMiddleware
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.exception_handlers import http_exception_handler
@@ -14,14 +15,25 @@ from src.configs.log_config import configure_logging
 from src.models.user import User
 from src.routes.embedding import router as embedding_router
 from src.security.jwt_auth import validate_token
+from src.security.rateLimiter import FastAPILimiter
+from src.security.rateLimiter.depends import RateLimiter
 
+# Initialize logging
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Configure logging
     configure_logging()
+    # Initialize Redis client
+    redis_client = redis.from_url(config.REDIS_URL)
+    if not redis_client:
+        raise Exception("Please configure Redis client for rate limiting")
+    # Initialize FastAPILimiter
+    await FastAPILimiter.init(redis_client)
     yield
+    await FastAPILimiter.close()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -44,13 +56,16 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
 @app.get("/")
-async def read_root():
+async def read_root(rate: None = Depends(RateLimiter(times=3, seconds=10))):
     logger.debug({"Origins": config.get_allowed_hosts})
     return {"greatings": "Welcome to the keyword embeddings API!"}
 
 
 @app.get("/users/me")
-async def read_users_me(current_user: User = Depends(validate_token)):
+async def read_users_me(
+    current_user: User = Depends(validate_token),
+    rate: None = Depends(RateLimiter(times=3, seconds=10)),
+):
     return current_user
 
 
