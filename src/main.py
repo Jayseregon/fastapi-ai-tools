@@ -57,7 +57,6 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 @app.get("/")
 async def read_root(rate: None = Depends(RateLimiter(times=3, seconds=10))):
-    logger.debug({"Origins": config.get_allowed_hosts})
     return {"greatings": "Welcome to the keyword embeddings API!"}
 
 
