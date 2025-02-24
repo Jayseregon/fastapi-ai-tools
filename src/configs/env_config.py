@@ -54,10 +54,12 @@ class EnvTestConfig(GlobalConfig):
 
 
 @lru_cache()
-def get_config(env_state: str):
+def get_config(env_state: Optional[str] = None):
     """Instantiate config based on the environment."""
+    if env_state is None:
+        env_state = BaseConfig().ENV_STATE or "prod"
     configs = {"dev": DevConfig, "prod": ProdConfig, "test": EnvTestConfig}
-    return configs[env_state]()
+    return configs.get(env_state, ProdConfig)()
 
 
 config = get_config(BaseConfig().ENV_STATE)
