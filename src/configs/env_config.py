@@ -37,25 +37,29 @@ class GlobalConfig(BaseConfig):
 
 
 class DevConfig(GlobalConfig):
+    ENV_STATE: str = "dev"
     model_config = SettingsConfigDict(env_prefix="DEV_")
 
 
 class ProdConfig(GlobalConfig):
+    ENV_STATE: str = "prod"
     model_config = SettingsConfigDict(env_prefix="PROD_")
 
 
-class TestConfig(GlobalConfig):
+class EnvTestConfig(GlobalConfig):
     # DATABASE_URL: str = "sqlite:///test.db"
     # DB_FORCE_ROLL_BACK: bool = True
-
+    ENV_STATE: str = "test"
     model_config = SettingsConfigDict(env_prefix="TEST_")
 
 
 @lru_cache()
-def get_config(env_state: str):
+def get_config(env_state: Optional[str] = None):
     """Instantiate config based on the environment."""
-    configs = {"dev": DevConfig, "prod": ProdConfig, "test": TestConfig}
-    return configs[env_state]()
+    if env_state is None:
+        env_state = BaseConfig().ENV_STATE or "prod"
+    configs = {"dev": DevConfig, "prod": ProdConfig, "test": EnvTestConfig}
+    return configs.get(env_state, ProdConfig)()
 
 
 config = get_config(BaseConfig().ENV_STATE)

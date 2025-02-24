@@ -121,3 +121,4 @@ end"""
     async def close(cls) -> None:
         if cls.redis:
             await cls.redis.close()
+            cls.redis = None  # set redis to None after closing
