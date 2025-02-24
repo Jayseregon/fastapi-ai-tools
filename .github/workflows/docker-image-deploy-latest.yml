@@ -33,6 +33,9 @@ jobs:
           PROD_REDIS_URL=${{ secrets.PROD_REDIS_URL }}
           EOF
 
+      - name: Clean up Docker images
+        run: docker system prune -a -f --volumes
+
       - name: Build Docker image
         run: docker buildx build --no-cache --platform linux/amd64 -t fastapi-ai-toolbox --load .
 
