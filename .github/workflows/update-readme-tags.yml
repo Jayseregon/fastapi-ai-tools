@@ -1,0 +1,56 @@
+name: Update README Tags on PR
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  update-readme:
+    runs-on: ubuntu-latest
+    env:
+      TZ: 'America/Montreal'  # Set timezone to Eastern Time
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install toml package
+        run: pip install toml
+
+      - name: Update README badges
+        run: |
+          # Read version directly from poetry section
+          VERSION=$(python -c "
+          import toml
+          try:
+              print(toml.load('pyproject.toml')['project']['version'])
+          except:
+              print('0.0.0')
+          ")
+          DATE_SUFFIX=$(TZ=$TZ date +'%m%d')
+          VERSION_TAG="${VERSION}.${DATE_SUFFIX}"
+          DATE_UPDATED=$(TZ=$TZ date +'%Y.%m.%d')
+          sed -i "s/version-[^)]*/version-${VERSION_TAG}-blue/g" README.md
+          sed -i "s/last%20updated-[^)]*/last%20updated-${DATE_UPDATED}-brightgreen/g" README.md
+
+      - name: Configure Git
+        run: |
+          git config --global user.name 'GitHub Actions'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git config pull.rebase true
+
+      - name: Check and commit changes
+        run: |
+          if [[ -n "$(git status --porcelain)" ]]; then
+            git add README.md
+            git commit -m 'Update version and last updated badges in README'
+            git pull --rebase origin ${{ github.head_ref }}
+            git push origin HEAD:${{ github.head_ref }}
+          else
+            echo "No changes to commit"
+          fi

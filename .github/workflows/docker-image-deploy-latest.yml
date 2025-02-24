@@ -1,0 +1,43 @@
+name: Build and Push Docker Image
+
+on:
+  # push:
+  #   branches:
+  #     - main
+  pull_request:
+    types:
+      - closed
+
+jobs:
+  build:
+    if: ${{ github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to Azure Container Registry
+        run: docker login -u ${{ secrets.ACR_USERNAME }} -p ${{ secrets.ACR_PASSWORD }} crdjangomaticprod01.azurecr.io
+
+      - name: Create .env file
+        run: |
+          cat <<EOF > .env
+          ENV_STATE=${{ secrets.ENV_STATE }}
+          PROD_SECRET_KEY=${{ secrets.PROD_SECRET_KEY }}
+          PROD_ALLOWED_HOSTS=${{ secrets.PROD_ALLOWED_HOSTS }}
+          PROD_ALLOWED_ISSUERS=${{ secrets.PROD_ALLOWED_ISSUERS }}
+          PROD_REDIS_URL=${{ secrets.PROD_REDIS_URL }}
+          EOF
+
+      - name: Build Docker image
+        run: docker buildx build --no-cache --platform linux/amd64 -t fastapi-ai-toolbox --load .
+
+      - name: Tag Docker image
+        run: docker tag fastapi-ai-toolbox crdjangomaticprod01.azurecr.io/fastapi-ai-toolbox:github-ci-test
+
+      - name: Push Docker image to ACR
+        run: docker image push crdjangomaticprod01.azurecr.io/fastapi-ai-toolbox:github-ci-test
