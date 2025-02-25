@@ -6,7 +6,6 @@ from asgi_correlation_id import CorrelationIdMiddleware
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.security import OAuth2PasswordBearer
 
@@ -46,8 +45,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-if config.ENV_STATE == "prod":
-    app.add_middleware(HTTPSRedirectMiddleware)
+# if config.ENV_STATE == "prod":
+#     app.add_middleware(HTTPSRedirectMiddleware)
 
 app.add_middleware(CorrelationIdMiddleware)
 

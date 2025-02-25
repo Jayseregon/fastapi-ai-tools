@@ -2,7 +2,7 @@
 .git
 .gitignore
 .env.local
-.env
+.env.*
 _dev*/
 quiz.ipynb
 .github
