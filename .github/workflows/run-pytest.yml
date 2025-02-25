@@ -7,6 +7,11 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      ENV_STATE: test
+      TEST_SECRET_KEY: VX9rOVWriEtG5T0QxU7a2BzL8km1N4sJqRD6cByPwOC3LjMf
+      TEST_ALLOWED_ISSUERS: testissuer
+      TEST_ALLOWED_HOSTS: "*"
 
     steps:
       - name: Checkout repository
@@ -23,9 +28,7 @@ jobs:
           echo "$HOME/.poetry/bin" >> $GITHUB_PATH
 
       - name: Install dependencies
-        run: |
-          poetry install
+        run: poetry install
 
       - name: Run pytest
-        run: |
-          poetry run pytest
+        run: poetry run pytest
