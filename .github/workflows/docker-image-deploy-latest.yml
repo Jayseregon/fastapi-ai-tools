@@ -40,7 +40,7 @@ jobs:
         run: docker buildx build --no-cache --platform linux/amd64 -t fastapi-ai-toolbox --load .
 
       - name: Tag Docker image
-        run: docker tag fastapi-ai-toolbox crdjangomaticprod01.azurecr.io/fastapi-ai-toolbox:github-ci-test
+        run: docker tag fastapi-ai-toolbox crdjangomaticprod01.azurecr.io/fastapi-ai-toolbox:github-ci-test-2
 
       - name: Push Docker image to ACR
-        run: docker image push crdjangomaticprod01.azurecr.io/fastapi-ai-toolbox:github-ci-test
+        run: docker image push crdjangomaticprod01.azurecr.io/fastapi-ai-toolbox:github-ci-test-2
