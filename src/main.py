@@ -7,6 +7,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.responses import HTMLResponse
 from fastapi.security import OAuth2PasswordBearer
 
 from src.configs.env_config import config
@@ -54,9 +55,39 @@ app.add_middleware(CorrelationIdMiddleware)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
-@app.get("/")
+@app.get("/", response_class=HTMLResponse)
 async def read_root(rate: None = Depends(RateLimiter(times=3, seconds=10))):
-    return {"greatings": "Welcome to the keyword embeddings API!"}
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Djangomatic AI Toolbox AI Home Page</title>
+        <style>
+            body { font-family: Arial, sans-serif; background-color: #f0f0f0; text-align: center; padding: 50px; }
+            .container { background-color: white; padding: 20px; border-radius: 10px; display: inline-block; }
+            .notice { border: 1px solid #ccc; padding: 20px; max-width: 500px; margin: 20px auto; text-align: justify; }
+            h1 { color: #333; }
+            p { color: #666; }
+            a { text-decoration: none; color: #007acc; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Welcome to Djangomatic AI Toolbox</h1>
+            <p>A robust FastAPI service for AI integration and Retrieval Augmented Generation workflows.</p>
+            <div class="notice">
+                <p><strong>Notice</strong></p>
+                <p>
+                    API usage is restricted to organization members only. Access is granted exclusively via the
+                    Djangomatic Pro platform using SSO authentication for chatbot and AI-agent services.
+                    Please authenticate via <a href="https://djangomatic-pro.azurewebsites.net">Djangomatic Pro</a>.
+                </p>
+            </div>
+            <a href="/docs">API Documentation</a>
+        </div>
+    </body>
+    </html>
+    """
 
 
 @app.get("/users/me")
