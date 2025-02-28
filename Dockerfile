@@ -1,5 +1,5 @@
 # --- Builder Stage ---
-FROM python:3.13.2-slim-bookworm AS builder
+FROM python:3.12.9-slim-bookworm AS builder
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
@@ -27,7 +27,7 @@ COPY sshd_config /etc/ssh/
 COPY . /code
 
 # --- Final (Runtime) Stage ---
-FROM python:3.13.2-slim-bookworm
+FROM python:3.12.9-slim-bookworm
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
