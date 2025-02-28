@@ -1,11 +1,11 @@
 [project]
 name = "fastapi-ai-tools"
-version = "0.2.2"
+version = "0.2.4"
 description = "AI & RAG backend tools"
 authors = [{ name = "jayseregon", email = "jayseregon@gmail.com" }]
 license = { text = "LGPL-3.0-or-later" }
 readme = "README.md"
-requires-python = ">=3.13,<4.0"
+requires-python = ">=3.12,<4.0"
 dependencies = [
     "fastapi[standard]",
     "transformers",
@@ -28,6 +28,8 @@ dependencies = [
     "redis",
     "pytest-mock",
     "pytest-asyncio",
+    "neo4j",
+    "chromadb",
 ]
 
 [build-system]
@@ -42,7 +44,7 @@ package-mode = false
 profile = "black"
 
 [tool.black]
-target-version = ["py313"]
+target-version = ["py312"]
 
 [tool.ruff]
 # Enable Pyflakes `E` and `F` codes by default.

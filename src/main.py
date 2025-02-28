@@ -17,6 +17,9 @@ from src.routes.embedding import router as embedding_router
 from src.security.jwt_auth import validate_token
 from src.security.rateLimiter import FastAPILimiter
 from src.security.rateLimiter.depends import RateLimiter
+from src.services.chromaData import router as chroma_router
+from src.services.db import chroma_service, neo4j_service
+from src.services.graphData import router as graph_router
 
 # Initialize logging
 logger = logging.getLogger(__name__)
@@ -34,6 +37,9 @@ async def lifespan(app: FastAPI):
     await FastAPILimiter.init(redis_client)
     yield
     await FastAPILimiter.close()
+    await redis_client.close()
+    neo4j_service.close()
+    chroma_service.close()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -45,9 +51,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# if config.ENV_STATE == "prod":
-#     app.add_middleware(HTTPSRedirectMiddleware)
 
 app.add_middleware(CorrelationIdMiddleware)
 
@@ -99,6 +102,8 @@ async def read_users_me(
 
 
 app.include_router(embedding_router)
+app.include_router(graph_router)
+app.include_router(chroma_router)
 
 
 @app.exception_handler(HTTPException)
