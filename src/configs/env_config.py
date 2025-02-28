@@ -18,6 +18,12 @@ class GlobalConfig(BaseConfig):
     ALLOWED_ISSUERS: str = ""
     ALLOWED_HOSTS: str = ""
     REDIS_URL: Optional[str] = None
+    NEO4J_USER: Optional[str] = None
+    NEO4J_PWD: Optional[str] = None
+    NEO4J_URI: Optional[str] = None
+    CHROMADB_HOST: Optional[str] = None
+    CHROMADB_PORT: Optional[int] = None
+    CHROMA_CLIENT_AUTH_CREDENTIALS: Optional[str] = None
 
     @property
     def get_allowed_issuers(self) -> list[str]:
