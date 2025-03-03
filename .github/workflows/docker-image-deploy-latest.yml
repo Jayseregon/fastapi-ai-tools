@@ -14,27 +14,60 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      - name: Check initial disk space
+      - name: Check pre-cleanup disk space
         run: |
-          echo "Initial disk space:"
+          echo "Disk space:"
           df -h
 
-      - name: Free up disk space
+      - name: Disk space cleanup
         run: |
-          # Remove unnecessary large packages
+          echo "Freeing up maximum disk space..."
+
+          # Remove large packages and their dependencies
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache
-          sudo apt-get remove -y '^ghc-.*' '^dotnet-.*' '^llvm-.*' 'mono-.*' '^ruby.*' '^python2.*'
+          sudo apt-get remove -y --purge '^ghc-.*' '^dotnet-.*' '^llvm-.*' 'mono-.*' '^ruby.*' '^python2.*' '^firefox.*' '^chromium.*' '^google-chrome.*' '^microsoft-edge.*'
           sudo apt-get autoremove -y
           sudo apt-get clean
 
-          # Remove large directories we don't need
-          sudo rm -rf /usr/local/share/boost /usr/local/lib/android
+          # Clear package manager caches
+          sudo rm -rf /var/lib/apt/lists/*
+          rm -rf ~/.npm
+          rm -rf ~/.cache/yarn
+          rm -rf ~/.cache/pip
 
-          # Docker cleanup (in case there are leftover containers/images)
+          # Remove large directories and unnecessary files
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /usr/share/doc
+          sudo rm -rf /usr/share/man
+          sudo rm -rf /var/cache/*
+
+          # Clean up /tmp
+          sudo find /tmp -type f -delete
+
+          # Docker aggressive cleanup
           docker system prune -a -f --volumes
-          docker volume prune -a -f
+          docker builder prune -a -f
+          docker volume prune -f
+          docker network prune -f
+          docker image prune -a -f
 
-          echo "Disk space after cleanup:"
+          # Remove all existing Docker images
+          docker rmi $(docker images -q) -f || true
+
+          # Remove swap file to free up more memory for the build
+          sudo swapoff -a
+          sudo rm -f /swapfile
+
+          # Clean up unnecessary large files in the home directory
+          find ~/ -type f -size +100M -not -path "*/\.*" -delete || true
+
+          echo "Disk space after super aggressive cleanup:"
+          df -h
+
+      - name: Check post-cleanup disk space
+        run: |
+          echo "Disk space:"
           df -h
 
       - name: Checkout repository
@@ -68,5 +101,5 @@ jobs:
       - name: Check final disk space
         if: always()
         run: |
-          echo "Final disk space:"
+          echo "Disk space:"
           df -h

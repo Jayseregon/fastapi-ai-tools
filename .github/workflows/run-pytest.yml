@@ -17,6 +17,34 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Check pre-cleanup disk space
+        run: |
+          echo "Disk space before cleanup:"
+          df -h
+
+      - name: Disk space cleanup
+        run: |
+          echo "Performing disk space cleanup..."
+
+          # Remove some unnecessary packages
+          sudo apt-get remove -y --purge '^ghc-.*' '^mono-.*' '^firefox.*'
+          sudo apt-get autoremove -y
+          sudo apt-get clean
+
+          # Clear package manager caches
+          sudo rm -rf /var/lib/apt/lists/*
+          rm -rf ~/.cache/pip
+
+          # Clean up /tmp
+          sudo find /tmp -type f -delete
+
+          # Basic Docker cleanup
+          docker system prune -f
+          docker image prune -f
+
+          echo "Disk space after cleanup:"
+          df -h
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -32,3 +60,9 @@ jobs:
 
       - name: Run pytest
         run: poetry run pytest
+
+      - name: Check disk space after tests
+        if: always()
+        run: |
+          echo "Disk space after tests:"
+          df -h
