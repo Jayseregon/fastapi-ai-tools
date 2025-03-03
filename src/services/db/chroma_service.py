@@ -31,8 +31,8 @@ class ChromaService:
                 ssl=False,
                 settings=Settings(
                     anonymized_telemetry=False,
-                    # chroma_client_auth_provider="chromadb.auth.basic_authn.BasicAuthClientProvider",
-                    # chroma_client_auth_credentials=config.CHROMA_CLIENT_AUTH_CREDENTIALS,
+                    chroma_client_auth_provider="chromadb.auth.basic_authn.BasicAuthClientProvider",
+                    chroma_client_auth_credentials=config.CHROMA_CLIENT_AUTH_CREDENTIALS,
                 ),
             )
             logger.info("ChromaDB client initialized")
