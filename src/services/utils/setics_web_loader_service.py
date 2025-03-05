@@ -1,7 +1,9 @@
 import logging
-from typing import Dict, Optional
+from typing import Dict, List, Optional
+from urllib.parse import urlparse
 
-import requests
+import httpx
+from langchain_core.documents import Document
 
 from src.services.utils.auth_web_loader_base import AuthWebLoaderBase
 
@@ -20,11 +22,15 @@ class SeticsWebLoaderService(AuthWebLoaderBase):
         self.password = None
         self.authenticity_token = None
 
-    def initialize(self, headers: Optional[Dict[str, str]] = None) -> None:
+    async def initialize(
+        self,
+        headers: Optional[Dict[str, str]] = None,
+        timeout: Optional[float] = 30.0,
+    ) -> None:
         """Override base class initialize to match its signature."""
-        super().initialize(headers=headers)
+        await super().initialize(headers=headers, timeout=timeout)
 
-    def authenticate(
+    async def authenticate(
         self,
         username: str,
         password: str,
@@ -33,7 +39,6 @@ class SeticsWebLoaderService(AuthWebLoaderBase):
         headers: Optional[Dict[str, str]] = None,
     ):
         """Authenticate with Setics website and return configured service."""
-        # Initialize with proper headers
         setics_headers = {
             "Content-Type": "application/x-www-form-urlencoded",
             "Origin": "https://support.setics-sttar.com",
@@ -42,22 +47,29 @@ class SeticsWebLoaderService(AuthWebLoaderBase):
         if headers:
             setics_headers.update(headers)
 
-        # Initialize first
-        self.initialize(headers=setics_headers)
+        if not self._initialized:
+            if self.client is None:
+                self.client = httpx.AsyncClient(follow_redirects=True)
 
-        # Store Setics-specific attributes
+            if setics_headers:
+                self.headers.update(setics_headers)
+
+            self._initialized = True
+
         self.username = username
         self.password = password
         self.login_url = login_url
         self.check_url = check_url
 
-        # Get authenticity token and perform login
-        self._get_authenticity_token()
-        return self.__call__()
+        # Get authenticity token
+        await self._get_authenticity_token()
 
-    def __call__(self):
+        return await self._perform_authentication()
+
+    async def _perform_authentication(self):
+        """Internal method to perform authentication without acquiring the lock again."""
         if not self._initialized or not self.authenticity_token:
-            raise ValueError("Service must be initialized before calling")
+            raise ValueError("Service must be initialized before authentication")
 
         try:
             payload = {
@@ -67,8 +79,11 @@ class SeticsWebLoaderService(AuthWebLoaderBase):
             }
 
             # Perform login
-            login_response = self.session.post(
-                self.login_url, data=payload, headers=self.headers, allow_redirects=True
+            login_response = await self.client.post(
+                self.login_url,
+                data=payload,
+                headers=self.headers,
+                follow_redirects=True,
             )
             login_response.raise_for_status()
 
@@ -76,7 +91,9 @@ class SeticsWebLoaderService(AuthWebLoaderBase):
 
             # Check if we can access a protected URL
             if self.check_url:
-                check_response = self.session.get(self.check_url, headers=self.headers)
+                check_response = await self.client.get(
+                    self.check_url, headers=self.headers
+                )
                 self.last_login_status = check_response.status_code == 200
                 if not self.last_login_status:
                     raise Exception(
@@ -96,12 +113,46 @@ class SeticsWebLoaderService(AuthWebLoaderBase):
             self.last_login_status = False
             raise
 
-    def _get_authenticity_token(self) -> None:
+    async def __call__(self):
+        if not self.authenticity_token:
+            raise ValueError("Authentication required before calling")
+        return await self._perform_authentication()
+
+    async def _get_authenticity_token(self) -> None:
         try:
-            login_page = self.session.get(self.login_url, headers=self.headers)
+            browser_headers = {
+                "Accept-Language": "en-US,en;q=0.9",
+                "Cache-Control": "no-cache",
+                "Pragma": "no-cache",
+                "Upgrade-Insecure-Requests": "1",
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "none",
+            }
+            request_headers = self.headers.copy()
+            request_headers.update(browser_headers)
+            print("Headers: ", request_headers)
+
+            # Extract domain from login URL
+            parsed_url = urlparse(self.login_url)
+            base_domain = f"{parsed_url.scheme}://{parsed_url.netloc}"
+            print("Base domain: ", base_domain)
+
+            # First visit homepage
+            home_page = await self.client.get(
+                base_domain, headers=self.headers, follow_redirects=True
+            )
+            print("Home page: ", home_page)
+            home_page.raise_for_status()
+
+            # Then visit login page
+            login_page = await self.client.get(
+                self.login_url, headers=self.headers, follow_redirects=True
+            )
+            print("Login page: ", login_page)
             login_page.raise_for_status()
 
-            self.authenticity_token = self._extract_token(login_page.content)
+            self.authenticity_token = self._extract_token(login_page.text)
             if not self.authenticity_token:
                 raise ValueError("Could not find authenticity token on login page")
 
@@ -111,11 +162,11 @@ class SeticsWebLoaderService(AuthWebLoaderBase):
             raise
 
     @property
-    def authenticated_session(self) -> requests.Session:
-        """Returns the authenticated session."""
+    def authenticated_client(self) -> httpx.AsyncClient:
+        """Returns the authenticated client."""
         if not self._initialized or not self.last_login_status:
-            raise ValueError("Authentication required before accessing session")
-        return self.session
+            raise ValueError("Authentication required before accessing client")
+        return self.client
 
     @property
     def request_headers(self) -> Dict[str, str]:
@@ -123,6 +174,13 @@ class SeticsWebLoaderService(AuthWebLoaderBase):
         if not self._initialized:
             raise ValueError("Service must be initialized before accessing headers")
         return self.headers.copy()  # Return copy to prevent modification
+
+    async def load_documents_from_urls(self, urls: str | List[str]) -> List[Document]:
+        """Load documents from Setics URLs."""
+        if not self._initialized:
+            raise ValueError("Service must be authenticated before loading documents")
+
+        return await self.load_documents(urls)
 
 
 # Create a singleton instance for Setics
