@@ -3,28 +3,17 @@ from typing import AsyncIterator, Dict, List, Optional
 
 from langchain_core.documents import Document
 
-from src.services.loaders.lib import DocumentLoader, HttpClient
+from src.services.loaders.web.base_loader import BaseLoader
 
 logger = logging.getLogger(__name__)
 
 
-class PublicLoader:
+class PublicLoader(BaseLoader):
     """Service for loading content from public websites."""
 
     def __init__(self):
         """Initialize the public web loader service."""
-        self._http_client = HttpClient()
-        self._document_loader = DocumentLoader()
-        self._initialized = False
-
-    async def __aenter__(self):
-        """Async context manager entry."""
-        await self.initialize()
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Async context manager exit."""
-        await self.close()
+        super().__init__()
 
     async def initialize(
         self, headers: Optional[Dict[str, str]] = None, timeout: float = 30.0
@@ -107,8 +96,7 @@ class PublicLoader:
 
     async def close(self) -> None:
         """Clean up resources asynchronously."""
-        await self._http_client.close()
-        self._initialized = False
+        await super().close()
 
 
 # Factory function for global access

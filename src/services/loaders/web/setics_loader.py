@@ -4,34 +4,24 @@ from urllib.parse import urlparse
 
 from langchain_core.documents import Document
 
-from src.services.loaders.lib import DocumentLoader, HttpClient, WebAuthentication
+from src.services.loaders.lib import HttpClient, WebAuthentication
+from src.services.loaders.web.base_loader import BaseLoader
 
 logger = logging.getLogger(__name__)
 
 
-class SeticsLoader:
+class SeticsLoader(BaseLoader):
     """Service for loading content from Setics authenticated websites."""
 
     def __init__(self):
         """Initialize the Setics web loader service with component services."""
-        self._http_client = HttpClient()
-        self._document_loader = DocumentLoader()
+        super().__init__()
         self._auth_service = WebAuthentication()
-        self._initialized = False
         self._authenticated = False
         self.login_url = None
         self.check_url = None
         self.username = None
         self.password = None
-
-    async def __aenter__(self):
-        """Async context manager entry."""
-        await self.initialize()
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Async context manager exit."""
-        await self.close()
 
     async def initialize(
         self, headers: Optional[Dict[str, str]] = None, timeout: float = 30.0
@@ -140,7 +130,6 @@ class SeticsLoader:
         Args:
             urls: Single URL or list of URLs to load
             continue_on_failure: Whether to continue if loading fails for some URLs
-            css_selector: Optional CSS selector to extract specific content
 
         Returns:
             List of loaded Documents
@@ -176,7 +165,6 @@ class SeticsLoader:
         Args:
             urls: Single URL or list of URLs to load
             continue_on_failure: Whether to continue if loading fails for some URLs
-            css_selector: Optional CSS selector to extract specific content
 
         Yields:
             Documents as they are loaded
@@ -219,8 +207,7 @@ class SeticsLoader:
 
     async def close(self) -> None:
         """Clean up resources asynchronously."""
-        await self._http_client.close()
-        self._initialized = False
+        await super().close()
         self._authenticated = False
 
 
