@@ -5,12 +5,12 @@ from urllib.parse import urlparse
 import httpx
 from bs4 import BeautifulSoup
 
-from src.services.utils.httpClientService import HttpClientService
+from src.services.loaders.lib.http_client import HttpClient
 
 logger = logging.getLogger(__name__)
 
 
-class WebAuthenticationService:
+class WebAuthentication:
     """Handles web authentication flows and token/cookie management."""
 
     def __init__(self):
@@ -40,48 +40,9 @@ class WebAuthenticationService:
 
         return None
 
-    async def extract_domain_cookies(
-        self, http_client: HttpClientService, urls: List[str]
-    ) -> Dict[str, str]:
-        """
-        Extract cookies with domain-awareness.
-
-        Args:
-            http_client: HTTP client with cookies
-            urls: URLs to consider for cookie domain matching
-
-        Returns:
-            Dictionary of cookies, prioritizing those matching target domains
-        """
-        if not http_client.client or not hasattr(http_client.client, "cookies"):
-            return {}
-
-        # Extract the first URL's domain to get proper cookies
-        target_domain = urlparse(urls[0]).netloc if urls else None
-        cookie_dict: Dict[str, str] = {}
-
-        # Get all cookies from jar
-        all_cookies = (
-            http_client.client.cookies.jar._cookies
-            if hasattr(http_client.client.cookies, "jar")
-            else {}
-        )
-
-        # Build cookie dict with domain preferences
-        for domain in all_cookies:
-            for path in all_cookies[domain]:
-                for name, cookie_obj in all_cookies[domain][path].items():
-                    # Prefer target domain cookies, overwrite others
-                    if target_domain and target_domain in domain:
-                        cookie_dict[name] = cookie_obj.value
-                    elif name not in cookie_dict:
-                        cookie_dict[name] = cookie_obj.value
-
-        return cookie_dict
-
     async def get_authenticity_token(
         self,
-        http_client: HttpClientService,
+        http_client: HttpClient,
         login_url: str,
         token_field: str = "authenticity_token",
         browser_headers: Optional[Dict[str, str]] = None,
@@ -131,7 +92,7 @@ class WebAuthenticationService:
 
     async def perform_form_authentication(
         self,
-        http_client: HttpClientService,
+        http_client: HttpClient,
         login_url: str,
         credentials: Dict[str, str],
         token_field: str = "authenticity_token",
@@ -202,7 +163,7 @@ class WebAuthenticationService:
 
     async def verify_authentication(
         self,
-        http_client: HttpClientService,
+        http_client: HttpClient,
         check_url: str,
         failure_strings: Optional[List[str]] = None,
     ) -> bool:
@@ -253,7 +214,7 @@ class WebAuthenticationService:
 
     async def complete_authentication_flow(
         self,
-        http_client: HttpClientService,
+        http_client: HttpClient,
         login_url: str,
         credentials: Dict[str, str],
         check_url: Optional[str] = None,

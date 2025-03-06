@@ -3,19 +3,18 @@ from typing import AsyncIterator, Dict, List, Optional
 
 from langchain_core.documents import Document
 
-from src.services.utils.documentLoaderService import DocumentLoaderService
-from src.services.utils.httpClientService import HttpClientService
+from src.services.loaders.lib import DocumentLoader, HttpClient
 
 logger = logging.getLogger(__name__)
 
 
-class PublicWebLoaderService:
+class PublicLoader:
     """Service for loading content from public websites."""
 
     def __init__(self):
         """Initialize the public web loader service."""
-        self._http_client = HttpClientService()
-        self._document_loader = DocumentLoaderService()
+        self._http_client = HttpClient()
+        self._document_loader = DocumentLoader()
         self._initialized = False
 
     async def __aenter__(self):
@@ -54,40 +53,6 @@ class PublicWebLoaderService:
         logger.debug(f"Initialized public web loader service with {timeout}s timeout")
 
     async def load_documents(
-        self,
-        urls: str | List[str],
-        continue_on_failure: bool = True,
-        css_selector: Optional[str] = None,
-    ) -> List[Document]:
-        """
-        Load documents from public URLs.
-
-        Args:
-            urls: Single URL or list of URLs to load
-            continue_on_failure: Whether to continue if loading fails for some URLs
-            css_selector: Optional CSS selector to extract specific content
-
-        Returns:
-            List of loaded Documents
-        """
-        if not self._initialized:
-            await self.initialize()
-
-        try:
-            # Use the document loader to load documents
-            return await self._document_loader.load_documents_from_urls(
-                http_client=self._http_client,
-                urls=urls,
-                css_selector=css_selector,
-                continue_on_failure=continue_on_failure,
-            )
-        except Exception as e:
-            logger.error(f"Error loading public documents: {str(e)}")
-            if not continue_on_failure:
-                raise
-            return []
-
-    async def load_documents_with_langchain(
         self, urls: str | List[str], continue_on_failure: bool = True
     ) -> List[Document]:
         """
@@ -117,35 +82,6 @@ class PublicWebLoaderService:
             return []
 
     async def lazy_load_documents(
-        self,
-        urls: str | List[str],
-        continue_on_failure: bool = True,
-        css_selector: Optional[str] = None,
-    ) -> AsyncIterator[Document]:
-        """
-        Lazily load documents from public URLs.
-
-        Args:
-            urls: Single URL or list of URLs to load
-            continue_on_failure: Whether to continue if loading fails for some URLs
-            css_selector: Optional CSS selector to extract specific content
-
-        Yields:
-            Documents as they are loaded
-        """
-        if not self._initialized:
-            await self.initialize()
-
-        # Use lazy loading from document loader
-        async for doc in self._document_loader.lazy_load_documents(
-            http_client=self._http_client,
-            urls=urls,
-            css_selector=css_selector,
-            continue_on_failure=continue_on_failure,
-        ):
-            yield doc
-
-    async def lazy_load_documents_with_langchain(
         self, urls: str | List[str], continue_on_failure: bool = True
     ) -> AsyncIterator[Document]:
         """
@@ -176,8 +112,8 @@ class PublicWebLoaderService:
 
 
 # Factory function for global access
-async def create_public_web_loader_service() -> PublicWebLoaderService:
+async def create_public_web_loader_service() -> PublicLoader:
     """Create and initialize a public web loader service."""
-    service = PublicWebLoaderService()
+    service = PublicLoader()
     await service.initialize()
     return service

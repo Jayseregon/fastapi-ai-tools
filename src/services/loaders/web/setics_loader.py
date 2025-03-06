@@ -4,21 +4,19 @@ from urllib.parse import urlparse
 
 from langchain_core.documents import Document
 
-from src.services.utils.documentLoaderService import DocumentLoaderService
-from src.services.utils.httpClientService import HttpClientService
-from src.services.utils.webAuthenticationService import WebAuthenticationService
+from src.services.loaders.lib import DocumentLoader, HttpClient, WebAuthentication
 
 logger = logging.getLogger(__name__)
 
 
-class SeticsWebLoaderService:
+class SeticsLoader:
     """Service for loading content from Setics authenticated websites."""
 
     def __init__(self):
         """Initialize the Setics web loader service with component services."""
-        self._http_client = HttpClientService()
-        self._document_loader = DocumentLoaderService()
-        self._auth_service = WebAuthenticationService()
+        self._http_client = HttpClient()
+        self._document_loader = DocumentLoader()
+        self._auth_service = WebAuthentication()
         self._initialized = False
         self._authenticated = False
         self.login_url = None
@@ -69,7 +67,7 @@ class SeticsWebLoaderService:
         login_url: str,
         check_url: Optional[str] = None,
         headers: Optional[Dict[str, str]] = None,
-    ) -> "SeticsWebLoaderService":
+    ) -> "SeticsLoader":
         """
         Authenticate with Setics website.
 
@@ -206,7 +204,7 @@ class SeticsWebLoaderService:
         return self._authenticated
 
     @property
-    def authenticated_client(self) -> HttpClientService:
+    def authenticated_client(self) -> HttpClient:
         """Get the authenticated HTTP client service."""
         if not self._initialized or not self._authenticated:
             raise ValueError("Authentication required before accessing client")
@@ -227,8 +225,8 @@ class SeticsWebLoaderService:
 
 
 # Factory function for global access
-async def create_setics_web_loader_service() -> SeticsWebLoaderService:
+async def create_setics_web_loader_service() -> SeticsLoader:
     """Create and initialize a Setics web loader service."""
-    service = SeticsWebLoaderService()
+    service = SeticsLoader()
     await service.initialize()
     return service

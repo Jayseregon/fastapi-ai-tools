@@ -7,7 +7,7 @@ import httpx
 logger = logging.getLogger(__name__)
 
 
-class HttpClientService:
+class HttpClient:
     """Manages HTTP client lifecycle and requests with proper resource handling."""
 
     def __init__(
