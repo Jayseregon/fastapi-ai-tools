@@ -1,19 +1,19 @@
+import asyncio
+import inspect
 import json
 import logging
-import threading
 from collections import deque
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 from urllib.parse import urljoin, urlparse
 
-import requests
 from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
 
 
-class UrlDiscoveryService:
-    """Service for discovering URLs by crawling websites."""
+class UrlDiscovery:
+    """Asynchronous service for discovering URLs by crawling websites."""
 
     def __init__(self):
         """Initialize the URL discovery service without any specific configuration."""
@@ -25,12 +25,20 @@ class UrlDiscoveryService:
         self.visited_urls = set()
         self.discovered_urls = set()
         self._initialized = False
-        self._lock = threading.RLock()
+        self._lock = asyncio.Lock()
+
+    async def __aenter__(self):
+        """Async context manager entry point. Returns self for method chaining."""
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit point. Reset state on exit."""
+        await self.reset()
 
     def initialize(
         self,
         base_url: str,
-        session: Optional[requests.Session] = None,
+        session: Any,
         headers: Optional[dict[str, str]] = None,
         max_depth: int = 2,
         same_domain_only: bool = True,
@@ -40,13 +48,20 @@ class UrlDiscoveryService:
 
         Args:
             base_url: The starting URL for discovery
-            session: Optional requests.Session for making HTTP requests
+            session: An async HTTP client (must have an async get method)
             headers: Optional HTTP headers to include in requests
             max_depth: Maximum depth to crawl (default: 2)
             same_domain_only: Whether to only crawl URLs on the same domain (default: True)
         """
         self.base_url = base_url
-        self.session = session or requests.Session()
+        self.session = session
+
+        # Validate the session has an async get method
+        if not hasattr(self.session, "get") or not inspect.iscoroutinefunction(
+            self.session.get
+        ):
+            raise ValueError("Session must have an async get method")
+
         self.headers = headers or {}
         self.max_depth = max_depth
         self.same_domain_only = same_domain_only
@@ -55,24 +70,32 @@ class UrlDiscoveryService:
         self._initialized = True
         logger.debug(f"URL Discovery Service initialized with base URL: {base_url}")
 
-    def __call__(
+    async def discover(
         self,
         base_url: Optional[str] = None,
-        session: Optional[requests.Session] = None,
+        session: Optional[Any] = None,
         headers: Optional[dict[str, str]] = None,
         max_depth: Optional[int] = None,
         same_domain_only: Optional[bool] = None,
     ) -> List[str]:
         """
-        Discover URLs by crawling from the base URL.
+        Asynchronously discover URLs by crawling from the base URL.
 
-        Can optionally override initialization parameters.
+        Args:
+            base_url: Optional URL to crawl (overrides the one set in initialize)
+            session: Optional async session to use (overrides the one set in initialize)
+            headers: Optional headers to use (overrides those set in initialize)
+            max_depth: Optional maximum depth to crawl (overrides the one set in initialize)
+            same_domain_only: Optional domain restriction (overrides the one set in initialize)
 
         Returns:
             List of discovered URLs
         """
         # Handle new parameters if provided
-        if base_url or not self._initialized:
+        if base_url or session or not self._initialized:
+            if not session and not self.session:
+                raise ValueError("An async HTTP client session is required")
+
             self.initialize(
                 base_url=base_url or self.base_url,
                 session=session or self.session,
@@ -89,13 +112,12 @@ class UrlDiscoveryService:
             logger.error("URL Discovery Service not initialized")
             raise ValueError("Service must be initialized before discovery")
 
-        return self._discover_urls()
+        return await self._discover_urls()
 
-    def _discover_urls(self) -> List[str]:
-        # Lock to prevent concurrent access to shared state
-        with self._lock:
+    async def _discover_urls(self) -> List[str]:
+        """Asynchronously discover URLs using an async HTTP client."""
+        async with self._lock:
             base_domain = urlparse(self.base_url).netloc
-            # Use deque for better performance in pop/append operations
             to_crawl = deque([(self.base_url, 0)])
             self.discovered_urls.clear()
             self.visited_urls.clear()
@@ -103,7 +125,7 @@ class UrlDiscoveryService:
             while to_crawl:
                 url, depth = to_crawl.popleft()
 
-                # Skip if already visited or beyond max depth
+                # Skip if already visited
                 if url in self.visited_urls:
                     continue
 
@@ -111,10 +133,10 @@ class UrlDiscoveryService:
                 logger.debug(f"Fetching: {url} (depth {depth})")
 
                 try:
-                    response = self.session.get(url, headers=self.headers, timeout=10)
-                    response.raise_for_status()  # Raise exception for 4XX/5XX responses
+                    # Use await with the async session
+                    response = await self.session.get(url, headers=self.headers)
 
-                    # Add to discovered URLs
+                    # Only add to discovered URLs if no exception was raised
                     self.discovered_urls.add(url)
 
                     # Don't crawl deeper if at max depth
@@ -140,10 +162,9 @@ class UrlDiscoveryService:
                         # Add to crawl queue
                         to_crawl.append((full_url, depth + 1))
 
-                except requests.exceptions.RequestException as e:
-                    logger.warning(f"Error fetching {url}: {str(e)}")
                 except Exception as e:
-                    logger.error(f"Unexpected error processing {url}: {str(e)}")
+                    # Do not add the URL to discovered_urls on error
+                    logger.warning(f"Error fetching {url}: {str(e)}")
 
         return list(self.discovered_urls)
 
@@ -168,15 +189,21 @@ class UrlDiscoveryService:
 
         return True
 
-    def to_json(self, filename: str | Path) -> None:
-        with self._lock:
+    async def to_json(self, filename: str | Path) -> None:
+        """
+        Save discovered URLs to a JSON file.
+
+        Args:
+            filename: Path where to save the JSON file
+        """
+        async with self._lock:
             if isinstance(filename, str):
                 filename = Path(filename)
 
             filename.parent.mkdir(parents=True, exist_ok=True)
 
-            if self.discovered_urls is None:
-                self._discover_urls()
+            if not self.discovered_urls:
+                await self._discover_urls()
 
             try:
                 with filename.open("w") as f:
@@ -186,7 +213,7 @@ class UrlDiscoveryService:
                 logger.error(f"Error saving URLs to {filename}: {str(e)}")
                 raise
 
-    def reset(self):
+    async def reset(self):
         """Reset the service state, clearing all URLs and settings."""
         self.base_url = None
         self.session = None
@@ -196,7 +223,3 @@ class UrlDiscoveryService:
         self.visited_urls.clear()
         self.discovered_urls.clear()
         self._initialized = False
-
-
-# Create a singleton instance
-url_discovery_service = UrlDiscoveryService()

@@ -408,3 +408,110 @@ class TestSeticsLoader:
         setics_loader.authenticate.assert_called_once()
         setics_loader.load_documents.assert_called_once()
         setics_loader.close.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_discover_urls_success(self, setics_loader, mock_http_client):
+        """Test successful URL discovery after authentication"""
+        # Setup the loader
+        setics_loader._http_client = mock_http_client
+        setics_loader._initialized = True
+        setics_loader._authenticated = True
+
+        # Mock discovered URLs
+        discovered_urls = [
+            "https://setics.com",
+            "https://setics.com/page1",
+            "https://setics.com/page2",
+        ]
+
+        # Mock UrlDiscovery
+        with patch(
+            "src.services.loaders.web.setics_loader.UrlDiscovery"
+        ) as MockDiscovery:
+            # Setup mock discovery instance
+            mock_instance = AsyncMock()
+            mock_instance.__aenter__.return_value = mock_instance
+            mock_instance.discover.return_value = discovered_urls
+            MockDiscovery.return_value = mock_instance
+
+            # Call discover_urls
+            base_url = "https://setics.com"
+            max_depth = 3
+            same_domain_only = False
+            custom_headers = {"X-Test": "Value"}
+
+            result = await setics_loader.discover_urls(
+                base_url=base_url,
+                max_depth=max_depth,
+                same_domain_only=same_domain_only,
+                headers=custom_headers,
+            )
+
+            # Verify UrlDiscovery was used correctly
+            MockDiscovery.assert_called_once()
+            mock_instance.__aenter__.assert_awaited_once()
+            mock_instance.__aexit__.assert_awaited_once()
+
+            # Verify discover was called with correct parameters
+            mock_instance.discover.assert_awaited_once()
+            call_args = mock_instance.discover.call_args[1]
+            assert call_args["base_url"] == base_url
+            assert call_args["session"] == mock_http_client
+            assert call_args["max_depth"] == max_depth
+            assert call_args["same_domain_only"] == same_domain_only
+            assert "headers" in call_args
+            assert call_args["headers"].get("X-Test") == "Value"
+
+            # Verify result
+            assert result == discovered_urls
+            assert len(result) == 3
+
+    @pytest.mark.asyncio
+    async def test_discover_urls_not_initialized(self, setics_loader):
+        """Test URL discovery without initialization"""
+        setics_loader._initialized = False
+
+        with pytest.raises(ValueError, match="Service must be initialized"):
+            await setics_loader.discover_urls("https://setics.com")
+
+    @pytest.mark.asyncio
+    async def test_discover_urls_not_authenticated(self, setics_loader):
+        """Test URL discovery without authentication"""
+        setics_loader._initialized = True
+        setics_loader._authenticated = False
+
+        with pytest.raises(ValueError, match="Authentication required"):
+            await setics_loader.discover_urls("https://setics.com")
+
+    @pytest.mark.asyncio
+    async def test_discover_urls_with_default_params(
+        self, setics_loader, mock_http_client
+    ):
+        """Test URL discovery with default parameters"""
+        # Setup the loader
+        setics_loader._http_client = mock_http_client
+        setics_loader._initialized = True
+        setics_loader._authenticated = True
+
+        # Set up headers directly on the mock HTTP client
+        # This avoids patching the property which can't be patched
+        mock_http_client.headers = {"User-Agent": "Test Agent"}
+
+        # Mock UrlDiscovery
+        with patch(
+            "src.services.loaders.web.setics_loader.UrlDiscovery"
+        ) as MockDiscovery:
+            # Setup mock discovery instance
+            mock_instance = AsyncMock()
+            mock_instance.__aenter__.return_value = mock_instance
+            mock_instance.discover.return_value = ["https://setics.com"]
+            MockDiscovery.return_value = mock_instance
+
+            # Call discover_urls with only required param
+            await setics_loader.discover_urls("https://setics.com")
+
+            # Verify defaults were used
+            call_args = mock_instance.discover.call_args[1]
+            assert call_args["max_depth"] == 2
+            assert call_args["same_domain_only"] is True
+            assert call_args["headers"] == {"User-Agent": "Test Agent"}

@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 from langchain_core.documents import Document
 
 from src.services.loaders.lib import HttpClient, WebAuthentication
+from src.services.loaders.lib.url_discovery import UrlDiscovery
 from src.services.loaders.web.base_loader import BaseLoader
 
 logger = logging.getLogger(__name__)
@@ -185,6 +186,55 @@ class SeticsLoader(BaseLoader):
             continue_on_failure=continue_on_failure,
         ):
             yield doc
+
+    async def discover_urls(
+        self,
+        base_url: str,
+        max_depth: int = 2,
+        same_domain_only: bool = True,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> List[str]:
+        """
+        Discover URLs by crawling from the base URL using an authenticated session.
+
+        Args:
+            base_url: The starting URL for discovery
+            max_depth: Maximum depth to crawl (default: 2)
+            same_domain_only: Whether to only crawl URLs on the same domain (default: True)
+            headers: Optional additional headers for discovery requests
+
+        Returns:
+            List of discovered URLs
+
+        Raises:
+            ValueError: If not authenticated
+        """
+        if not self._initialized:
+            raise ValueError("Service must be initialized before discovering URLs")
+
+        if not self._authenticated:
+            raise ValueError("Authentication required before discovering URLs")
+
+        # Prepare headers
+        discovery_headers = self.request_headers
+        if headers:
+            discovery_headers.update(headers)
+
+        logger.debug(f"Starting URL discovery from {base_url} with depth {max_depth}")
+
+        # Use UrlDiscovery as a context manager
+        async with UrlDiscovery() as discovery:
+            # Use the authenticated session from this loader with async_discover
+            urls = await discovery.discover(
+                base_url=base_url,
+                session=self._http_client,
+                headers=discovery_headers,
+                max_depth=max_depth,
+                same_domain_only=same_domain_only,
+            )
+
+        logger.info(f"Discovered {len(urls)} URLs from {base_url}")
+        return urls
 
     @property
     def is_authenticated(self) -> bool:
