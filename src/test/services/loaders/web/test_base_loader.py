@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from src.services.loaders.lib import DocumentLoader, HttpClient
-from src.services.loaders.web.base_loader import BaseWebLoader
+from src.services.loaders.web.base_web_loader import BaseWebLoader
 
 
 # Create a concrete implementation of BaseWebLoader for testing
