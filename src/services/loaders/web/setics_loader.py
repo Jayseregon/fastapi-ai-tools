@@ -6,12 +6,12 @@ from langchain_core.documents import Document
 
 from src.services.loaders.lib import HttpClient, WebAuthentication
 from src.services.loaders.lib.url_discovery import UrlDiscovery
-from src.services.loaders.web.base_loader import BaseLoader
+from src.services.loaders.web.base_loader import BaseWebLoader
 
 logger = logging.getLogger(__name__)
 
 
-class SeticsLoader(BaseLoader):
+class SeticsLoader(BaseWebLoader):
     """Service for loading content from Setics authenticated websites."""
 
     def __init__(self):

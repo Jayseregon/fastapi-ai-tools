@@ -3,12 +3,12 @@ from typing import AsyncIterator, Dict, List, Optional
 
 from langchain_core.documents import Document
 
-from src.services.loaders.web.base_loader import BaseLoader
+from src.services.loaders.web.base_loader import BaseWebLoader
 
 logger = logging.getLogger(__name__)
 
 
-class PublicLoader(BaseLoader):
+class PublicLoader(BaseWebLoader):
     """Service for loading content from public websites."""
 
     def __init__(self):

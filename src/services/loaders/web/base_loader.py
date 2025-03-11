@@ -7,7 +7,7 @@ from src.services.loaders.lib import DocumentLoader, HttpClient
 logger = logging.getLogger(__name__)
 
 
-class BaseLoader(ABC):
+class BaseWebLoader(ABC):
     """Base class for web content loaders."""
 
     def __init__(self, http_client=None, document_loader=None):
