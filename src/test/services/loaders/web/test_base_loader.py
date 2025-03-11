@@ -3,12 +3,12 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from src.services.loaders.lib import DocumentLoader, HttpClient
-from src.services.loaders.web.base_loader import BaseLoader
+from src.services.loaders.web.base_loader import BaseWebLoader
 
 
-# Create a concrete implementation of BaseLoader for testing
-class _TestableLoader(BaseLoader):
-    """Concrete implementation of BaseLoader for testing"""
+# Create a concrete implementation of BaseWebLoader for testing
+class _TestableLoader(BaseWebLoader):
+    """Concrete implementation of BaseWebLoader for testing"""
 
     async def initialize(self, headers=None, timeout=30.0):
         """Implementation of abstract initialize method"""
@@ -22,7 +22,7 @@ class _TestableLoader(BaseLoader):
         self._initialized = False
 
 
-class TestBaseLoader:
+class TestBaseWebLoader:
     @pytest.fixture
     def mock_http_client(self):
         client = AsyncMock(spec=HttpClient)
@@ -92,10 +92,10 @@ class TestBaseLoader:
         mock_http_client.close.assert_called_once()
 
     def test_abstract_methods(self):
-        """Test that BaseLoader properly enforces abstract methods"""
+        """Test that BaseWebLoader properly enforces abstract methods"""
         with pytest.raises(TypeError, match=r"abstract method"):
             # Trying to instantiate the abstract base class should fail
-            BaseLoader()
+            BaseWebLoader()
 
     @pytest.mark.asyncio
     async def test_abstract_initialize_implementation(
