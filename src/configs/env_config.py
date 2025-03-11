@@ -24,6 +24,8 @@ class GlobalConfig(BaseConfig):
     CHROMADB_HOST: Optional[str] = None
     CHROMADB_PORT: Optional[int] = None
     CHROMA_CLIENT_AUTH_CREDENTIALS: Optional[str] = None
+    SETICS_USER: Optional[str] = None
+    SETICS_PWD: Optional[str] = None
 
     @property
     def get_allowed_issuers(self) -> list[str]:
