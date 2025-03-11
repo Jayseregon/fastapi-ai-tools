@@ -6,7 +6,7 @@ from langchain_core.documents import Document
 
 from src.services.loaders.lib import HttpClient, WebAuthentication
 from src.services.loaders.lib.url_discovery import UrlDiscovery
-from src.services.loaders.web.base_loader import BaseWebLoader
+from src.services.loaders.web.base_web_loader import BaseWebLoader
 
 logger = logging.getLogger(__name__)
 

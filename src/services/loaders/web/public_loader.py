@@ -3,7 +3,7 @@ from typing import AsyncIterator, Dict, List, Optional
 
 from langchain_core.documents import Document
 
-from src.services.loaders.web.base_loader import BaseWebLoader
+from src.services.loaders.web.base_web_loader import BaseWebLoader
 
 logger = logging.getLogger(__name__)
 
