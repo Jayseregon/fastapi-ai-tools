@@ -1,0 +1,170 @@
+[
+  {
+    "page_content": "Underground Fibre and Conduit Architecture for FSA\nConfidential\n\nUnderground Fibre and Conduit\nArchitecture for FSA\n\nBest Practice & Guideline\n\nVersion 1.0\n\nDate of Issue:\n2024/Feb/15\n\nDocument Number:\n\n### 2.1.10 Revision\n\n[Publish Date]\n\n[IMAGE: Xplore\u00ae logo featuring a stylized \"X\" design with a modern aesthetic. Xplore\u00ae]",
+    "metadata": {
+      "producer": "Microsoft: Print To PDF",
+      "creator": "",
+      "creationdate": "2024-02-27T07:37:23-08:00",
+      "source": "/Users/jayseregon/Documents/Telecon Design/Standards Xplore/2.1.10 Underground Fibre and Conduit Architecture for FSA.pdf",
+      "file_path": "/Users/jayseregon/Documents/Telecon Design/Standards Xplore/2.1.10 Underground Fibre and Conduit Architecture for FSA.pdf",
+      "total_pages": 8,
+      "format": "PDF 1.7",
+      "title": "Microsoft Word - 2.1.10 Underground Fibre and Conduit Architecture.docx",
+      "author": "KathrinKr",
+      "subject": "",
+      "keywords": "",
+      "moddate": "2024-02-27T07:37:23-08:00",
+      "trapped": "",
+      "modDate": "D:20240227073723-08'00'",
+      "creationDate": "D:20240227073723-08'00'",
+      "page": 0
+    }
+  },
+  {
+    "page_content": "Underground Fibre and Conduit\nArchitecture for FSA\n\nPurpose:\nThe objective of this guideline is to give a clear outline of Xplore best practices and standard on fibre drop\nconduit and drop cable design architecture in FSA design.\nThe ultimate goal is to place the facilities by the most economical method, minimizing material costs to\nprovide a service enabled network.\nScope:\nThe guideline covers the key aspect such as conduit design consideration, drop cable installation criteria,\nand conduit sizes for different purposes. The guideline only covers drop conduit to Single\nFamily/Business Unit premise, Multi-Tenant Unit premise is not covered in this document.\nApplicability:\nThis document is applicable to Outside Plant fibre engineers, designers, construction managers, and\nproject mangers involved in the planning, design, and implementation of underground conduit systems\nand fibre drop cable design and installation for Xplore Fibre-To-The-Premise.\nReferences to existing Xplore National Standards \u2013 Fibre:\n\u2022 3.2.1 Drop Placement Guideline\n\u2022 3.2.4 Locatable Muletape and Tonerwire\n\u2022 3.2.6 Fibre Underground Placement Standard\n\n[IMAGE: Xplore logo featuring a stylized letter \"X\" with a modern design. Xplore\u00ae]",
+    "metadata": {
+      "producer": "Microsoft: Print To PDF",
+      "creator": "",
+      "creationdate": "2024-02-27T07:37:23-08:00",
+      "source": "/Users/jayseregon/Documents/Telecon Design/Standards Xplore/2.1.10 Underground Fibre and Conduit Architecture for FSA.pdf",
+      "file_path": "/Users/jayseregon/Documents/Telecon Design/Standards Xplore/2.1.10 Underground Fibre and Conduit Architecture for FSA.pdf",
+      "total_pages": 8,
+      "format": "PDF 1.7",
+      "title": "Microsoft Word - 2.1.10 Underground Fibre and Conduit Architecture.docx",
+      "author": "KathrinKr",
+      "subject": "",
+      "keywords": "",
+      "moddate": "2024-02-27T07:37:23-08:00",
+      "trapped": "",
+      "modDate": "D:20240227073723-08'00'",
+      "creationDate": "D:20240227073723-08'00'",
+      "page": 1
+    }
+  },
+  {
+    "page_content": "## Table of Contents\n\n- **1** Definitions and Abbreviations (page 4)\n- **2** Introduction (page 4)\n- **3** Conduit (page 5)\n- **3.1** Mainway Routing (page 5)\n- **3.2** Drop Conduit Routing (page 5)\n- **4** Flowerpot (page 6)\n- **4.1** Flower Pot Installation Criteria (page 6)\n- **5** Demarcation Location (page 6)\n- **6** Drop Cable (page 7)\n- **6.1** Pre-Sale Order: (page Error! Bookmark not defined.)\n- **6.2** No Pre-Sale Order: (page Error! Bookmark not defined.)\n- **7** Document Information (page 8)\n- **7.1** Original Document Authors / Contributors (page 8)\n- **7.2** Document Approvers (page 8)\n- **7.3** Document Revision History (page 8)\n\n## Table of Figures\n\n- Figure 1: Underground Drop Placement Standard Overview (page 5)\n- Figure 2: Mainway & Drop Conduit and Flower Pot Placement (page 6)\n- Figure 3: Conduit and Drop Cable Placement in Pre-Sale and No Pre-Sale Scenario (page 7)\n\n[IMAGE: **Summary:** Logo of \"Xplore\" featuring a stylized letter 'X'. **Text Extracted:** Xplore\u00ae]",
+    "metadata": {
+      "producer": "Microsoft: Print To PDF",
+      "creator": "",
+      "creationdate": "2024-02-27T07:37:23-08:00",
+      "source": "/Users/jayseregon/Documents/Telecon Design/Standards Xplore/2.1.10 Underground Fibre and Conduit Architecture for FSA.pdf",
+      "file_path": "/Users/jayseregon/Documents/Telecon Design/Standards Xplore/2.1.10 Underground Fibre and Conduit Architecture for FSA.pdf",
+      "total_pages": 8,
+      "format": "PDF 1.7",
+      "title": "Microsoft Word - 2.1.10 Underground Fibre and Conduit Architecture.docx",
+      "author": "KathrinKr",
+      "subject": "",
+      "keywords": "",
+      "moddate": "2024-02-27T07:37:23-08:00",
+      "trapped": "",
+      "modDate": "D:20240227073723-08'00'",
+      "creationDate": "D:20240227073723-08'00'",
+      "page": 2
+    }
+  },
+  {
+    "page_content": "# 1 Definitions and Abbreviations\n\nFDH\nFibre Distribution Hub\nFOSC\nFibre Optic Splice Closure\nFP\nFlower Pot\nFSA\nFibre Servicing Area\nMPT\nMulti-Port Terminal\nMxU\nMulti (Dwelling/Tenent) Unit\nNID\nNetwork Interface Device\nP/L\nProperty Line\nRoE\nRight of Entry\nSxU\nSingle (Family/Business) Unit\n\n# 2 Introduction\n\nThis guideline outlines and defines the best practices and standards for the placement of new distribution\nconduit and fibre drop cable within Xplore Fibre Servicing Area (FSA) design, offering insights to\nengineers and technicians to optimize network performance, increase installation efficiencies and\nminimize maintenance efforts.\nThe main characteristics of the underground drop cable and conduit architecture are:\n\u2022 Every Single Family/Business Unit (SxU) premise will have a drop conduit placed to property line.\n\u2022 A fibre drop cable will be placed to demarcation location, where Network Interface Device (NID) is\nplaced, IF there is a Right-of-Entry (RoE) agreement signed prior to FSA build.\n\u2022 Drop conduit will end at a flower pot placed at property line (P/L) if there is no RoE agreement\nsigned prior to FSA build.\n\u2022 Maximum drop conduit length between pull boxes is 100m (standard) and 200m in rural settings.\n\u2022 Round Drop cable is recommended in underground pulling application.\n\u2022 All permit applications should have placement of flowerpot on the drawing.\n**See Figure 1** for a typical drop placement for SxU premise.\n\n[IMAGE: Xplore logo, featuring stylized \"X\" with dark green and light green hues. Xplore\u00ae]\n[IMAGE: **Summary:** Diagram illustrating the new underground drop placement standard for fiber optic installations, detailing components including FDH, FOSC, MPT, and NID. **Text Extraction:** NEW UNDERGROUND DROP PLACEMENT STANDARD FDH 1. Distribution conduit 2. Distribution fibre from FDH 3. Splice closure inside main splice vault MPT: Multi-Port Terminal P/L: Property Line FOSC: Fibre Optic Splice Closure FDH: Fibre Distribution Hub NID: Network Interconnection Device 4. MPT stub cable 5. MPT inside ground level service box 6. 18/14mm drop conduit (Microduct) to property line 7. \u201cFlower Pot\u201d - Circular handhole 8. Drop cable to NID or coiled inside FP. Remove FP when drop placed to house.]",
+    "metadata": {
+      "producer": "Microsoft: Print To PDF",
+      "creator": "",
+      "creationdate": "2024-02-27T07:37:23-08:00",
+      "source": "/Users/jayseregon/Documents/Telecon Design/Standards Xplore/2.1.10 Underground Fibre and Conduit Architecture for FSA.pdf",
+      "file_path": "/Users/jayseregon/Documents/Telecon Design/Standards Xplore/2.1.10 Underground Fibre and Conduit Architecture for FSA.pdf",
+      "total_pages": 8,
+      "format": "PDF 1.7",
+      "title": "Microsoft Word - 2.1.10 Underground Fibre and Conduit Architecture.docx",
+      "author": "KathrinKr",
+      "subject": "",
+      "keywords": "",
+      "moddate": "2024-02-27T07:37:23-08:00",
+      "trapped": "",
+      "modDate": "D:20240227073723-08'00'",
+      "creationDate": "D:20240227073723-08'00'",
+      "page": 3
+    }
+  },
+  {
+    "page_content": "**Figure 1: Underground Drop Placement Standard Overview**\n\n# 3 Conduit\n\n## 3.1 Mainway Routing\n\nXplore\u2019s preferred method is to place of one (1) 50mm conduit as main way at a minimum where the\ndistribution cable needs to be extended within the FSA footprint. In most cases the placement of 1-50mm\nconduit will be sufficient for placement of the cable for the FSA build, for the future growth as well as\nexpansion, should it be required. A second conduit of 50mm should be placed at this time if the designer\nfeels that:\n\u2022 There is a chance of substantial growth in the future.\n\u2022 The route is the major route of the distribution network.\nThe current cable capacities along with future and restorative capacity requirements must be considered\nwhen determining the size and number of conduits required through a section.\nA conduit will be considered full once 70% of its area volume has been occupied.\nDistribution cables, Transport cables, and MPT tails should be placed inside main way conduit.\n\n## 3.2 Drop Conduit Routing\n\nNote: Xplore will place drop conduit to all Single Family or Business Unit (SxU) property.\nXplore\u2019s preferred method is to place one (1) 18/14mm or 14/10mm conduit as drop conduit to property line\n(P/L) at the minimum. **See Figure 2** for details.\nThe path from the property line to NID, usually on the side of the building, can be direct buried if possible.\nDrop paths from Service Box (SB), where Multiport Terminal (MPT) is located, to P/L or flower pot must\nremain within the public Right-of-Way or documented utility easement and must never transition from\nprivate property to private property.\nIt is recommended to keep both side of the conduits capped until drop cable placement is completed.\nIn the public right-of-way the drop conduit length should be kept to a maximum of 100m from the\nterminal location to P/L or flower pot, to keep the pulling length to a reasonable distance.\nIn some instances, such as in rural settings, there may be the need to design a longer duct length due to\nlocation of the terminal in relation to the P/L or flower pot. We would recommend to keep this distance at\na maximum of 200m. Should you require longer distances we recommend a pull box in between to allow\nfor easier installation at time-of-service order.\nNote: Some jurisdictions may have certain parameters in place which can impact the design and build\nsuch as:\n\u2022 Use of existing vs. new infrastructure.\n\u2022 Above grade vs. below grade - jurisdiction preference with factors such as snow removal and\nwater table nuances. A pedestal should be used instead of Service Box.\n\n[IMAGE: Xplore logo featuring stylized \"X\" and brand name. Xplore\u00ae]",
+    "metadata": {
+      "producer": "Microsoft: Print To PDF",
+      "creator": "",
+      "creationdate": "2024-02-27T07:37:23-08:00",
+      "source": "/Users/jayseregon/Documents/Telecon Design/Standards Xplore/2.1.10 Underground Fibre and Conduit Architecture for FSA.pdf",
+      "file_path": "/Users/jayseregon/Documents/Telecon Design/Standards Xplore/2.1.10 Underground Fibre and Conduit Architecture for FSA.pdf",
+      "total_pages": 8,
+      "format": "PDF 1.7",
+      "title": "Microsoft Word - 2.1.10 Underground Fibre and Conduit Architecture.docx",
+      "author": "KathrinKr",
+      "subject": "",
+      "keywords": "",
+      "moddate": "2024-02-27T07:37:23-08:00",
+      "trapped": "",
+      "modDate": "D:20240227073723-08'00'",
+      "creationDate": "D:20240227073723-08'00'",
+      "page": 4
+    }
+  },
+  {
+    "page_content": "# 4 Flower Pot\n\nThe flower pot (FP) needs to be installed with the lid flush to ground level. This will allow for easy access\nto the drop for future installation to the building. Whether it is temporary or permanent in nature, try to\ninstall the flower pot in the least intrusive location for the occupants. The flower pot has an Electric Marker\n(EM) equipped locatable lid.\nWhen proposing flower pot placement, the location must be as close as possible to the back of Right-of-\nWay & property line, adjacent to the other utilities. Where possible it should be placed on a joint property\nline in order to feed both premises from the same flower pot.\nIn areas where the location of the flower pot at property line is not feasible on the demarcation side due to\nconcrete coverage or other obstructions, it can be placed in the most strategic location which will allow a\nsuccessful drop to be placed in the future.\n\n## 4.1 Flower Pot Installation Criteria\n\n\u2022 Only install flower pot for a SxU premise if a Right-of-Entry (RoE) is not signed during the time of\nFSA construction. In this scenario, the drop conduit ends in a flower pot is required.\nFigure 2 shows the proper design and placement of main way conduit, drop conduit, and flower pot.\n\n**Figure 2: Mainway & Drop Conduit and Flower Pot Placement**\n\n# 5 Demarcation Location\n\nXplore\u2019s demarcation location should be in the vicinity of the existing electrical meter and Telco / CATV\nNetwork Interface Device (NID).\n\n[IMAGE: Summary: Logo of \"Xplore\" featuring a stylized \"X\" design in green and light gradient. Text: Xplore\u00ae]\n[IMAGE: Mainway and Drop Conduit diagram illustrating placements of conduits and flower pots under specific conditions (RoE: Presence/Absence). Mainway & Drop Conduit NO RoE NO RoE ROE L/L Flower Pot P/L P/L Service Box Drop Conduit (18/14mm) Mainway Conduit (50mm) NO RoE Flower Pot is placed on the demarcation side]",
+    "metadata": {
+      "producer": "Microsoft: Print To PDF",
+      "creator": "",
+      "creationdate": "2024-02-27T07:37:23-08:00",
+      "source": "/Users/jayseregon/Documents/Telecon Design/Standards Xplore/2.1.10 Underground Fibre and Conduit Architecture for FSA.pdf",
+      "file_path": "/Users/jayseregon/Documents/Telecon Design/Standards Xplore/2.1.10 Underground Fibre and Conduit Architecture for FSA.pdf",
+      "total_pages": 8,
+      "format": "PDF 1.7",
+      "title": "Microsoft Word - 2.1.10 Underground Fibre and Conduit Architecture.docx",
+      "author": "KathrinKr",
+      "subject": "",
+      "keywords": "",
+      "moddate": "2024-02-27T07:37:23-08:00",
+      "trapped": "",
+      "modDate": "D:20240227073723-08'00'",
+      "creationDate": "D:20240227073723-08'00'",
+      "page": 5
+    }
+  },
+  {
+    "page_content": "# 6 Drop Cable\n\nXplore has approved two types of fibre drop cables:\n\u2022 Pre-Connectorized 1F Round Drop cable (Round drop) for Underground application.\n\u2022 Pre-Connectorized 1F Flat Drop cable (Flat drop) for Aerial application.\nAll drops will run from strategically placed MPT location to feed every SxU premise in the FSA.\nThe drop conduit must be placed with a tracer wire up to the property line.\nAll underground designs will require 18/14mm or 14/10mm to be used for drop conduit.\nNote: Xplore is only authorized to extend fibre facility to a SxU demarcation (from property to NID) if there\nis a RoE agreement signed.\n**See Figure 3** for reference.\n\n**Figure 3: Conduit and Drop Cable Placement in Pre-Sale and No Pre-Sale Scenario**\n\n[IMAGE: Xplore logo featuring stylized letter 'X' in green and gray gradient colors. Xplore\u00ae]\n[IMAGE: **Summary:** Diagram illustrating conduit and drop cable placement in RoE (Right of Entry) and no-RoE scenarios, showcasing components like NID, MPT, and service box with annotations for steps and details. **Extracted Text:** Conduit & Drop Cable Placement in RoE and no-RoE Scenario RoE NO RoE 1 Distribution cable from FDH 2 Splice closure inside main splice vault 3 MPT inside ground level service box 4 Drop conduit (18/14 mm) to Property Line 5 Flower Pot 6 NID Box - Fibre termination Direct Buried Drop Cable Mainway conduit (50mm) Drop Cable in conduit Drop Cable in conduit NID NID NID NID MPT Stub TO FDH]",
+    "metadata": {
+      "producer": "Microsoft: Print To PDF",
+      "creator": "",
+      "creationdate": "2024-02-27T07:37:23-08:00",
+      "source": "/Users/jayseregon/Documents/Telecon Design/Standards Xplore/2.1.10 Underground Fibre and Conduit Architecture for FSA.pdf",
+      "file_path": "/Users/jayseregon/Documents/Telecon Design/Standards Xplore/2.1.10 Underground Fibre and Conduit Architecture for FSA.pdf",
+      "total_pages": 8,
+      "format": "PDF 1.7",
+      "title": "Microsoft Word - 2.1.10 Underground Fibre and Conduit Architecture.docx",
+      "author": "KathrinKr",
+      "subject": "",
+      "keywords": "",
+      "moddate": "2024-02-27T07:37:23-08:00",
+      "trapped": "",
+      "modDate": "D:20240227073723-08'00'",
+      "creationDate": "D:20240227073723-08'00'",
+      "page": 6
+    }
+  },
+  {
+    "page_content": "# 7 Document Information\n\n## 7.1 Original Document Authors / Contributors\n\nName\nPosition\nRole\nKathrin Krautzig\nFibre Standard and Quality Consultant\nOriginator / Author\nJacky Wong\nSenior Engineer\nOriginator / Author\n\n## 7.2 Document Approvers\n\nName\nPosition\nDate\nStatus\nSeth Amankwah\nDirector, Fibre Engineering\n2022/Oct/31\n\n## 7.3 Document Revision History\n\nDate of Revision\nRevised By\nDescription\nRevision\nPage #\nRevised\nSection\n-\n\n[IMAGE: Xplore logo featuring the word \"Xplore\" with a stylized \"X\" design. Xplore\u00ae]\n\nTABLE:\n|Name|Position|Role|\n|---|---|---|\n|Kathrin Krautzig|Fibre Standard and Quality Consultant|Originator / Author|\n|Jacky Wong|Senior Engineer|Originator / Author|\n||||\n\nTABLE:\n|Name|Position|Date|Status|\n|---|---|---|---|\n|Seth Amankwah|Director, Fibre Engineering|2022/Oct/31||\n\nTABLE:\n|Date of Revision|Revised By|Description|Col4|Revision|Col6|Col7|Revised|Col9|\n|---|---|---|---|---|---|---|---|---|\n|||||Page #|||Section||\n|-|||||||||\n||||||||||\n\n||||||||||",
+    "metadata": {
+      "producer": "Microsoft: Print To PDF",
+      "creator": "",
+      "creationdate": "2024-02-27T07:37:23-08:00",
+      "source": "/Users/jayseregon/Documents/Telecon Design/Standards Xplore/2.1.10 Underground Fibre and Conduit Architecture for FSA.pdf",
+      "file_path": "/Users/jayseregon/Documents/Telecon Design/Standards Xplore/2.1.10 Underground Fibre and Conduit Architecture for FSA.pdf",
+      "total_pages": 8,
+      "format": "PDF 1.7",
+      "title": "Microsoft Word - 2.1.10 Underground Fibre and Conduit Architecture.docx",
+      "author": "KathrinKr",
+      "subject": "",
+      "keywords": "",
+      "moddate": "2024-02-27T07:37:23-08:00",
+      "trapped": "",
+      "modDate": "D:20240227073723-08'00'",
+      "creationDate": "D:20240227073723-08'00'",
+      "page": 7
+    }
+  }
+]

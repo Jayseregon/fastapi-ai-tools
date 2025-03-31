@@ -2,11 +2,7 @@ from typing import List, Optional
 
 from langchain.schema import Document
 
-from src.services.processors.cleaning_strategies import (
-    CleaningStrategy,
-    HeaderFooterRemovalStrategy,
-    WhitespaceNormalizationStrategy,
-)
+from src.services.processors.cleaning_strategies import *
 
 
 class PdfDocumentCleaner:
@@ -16,6 +12,12 @@ class PdfDocumentCleaner:
         """Initialize with cleaning strategies."""
         self.strategies = strategies or [
             HeaderFooterRemovalStrategy(),
+            WhitespaceNormalizationStrategy(),
+            ImageDescriptionStrategy(mode="compact"),
+            TableFormattingStrategy(),
+            TableOfContentsStrategy(),
+            SectionHeadingStrategy(),
+            FigureReferenceStrategy(),
             WhitespaceNormalizationStrategy(),
         ]
 
