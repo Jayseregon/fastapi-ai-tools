@@ -1,4 +1,3 @@
-import json
 import logging
 from pathlib import Path
 from typing import Optional, Self
@@ -14,6 +13,7 @@ from langchain_openai import ChatOpenAI
 
 from src.configs.env_config import config
 from src.services.loaders.files.base_document_loader import BaseDocumentLoader
+from src.services.utils import DocumentJsonToolkit
 
 logger = logging.getLogger(__name__)
 
@@ -64,40 +64,10 @@ class PdfLoader(BaseDocumentLoader):
     async def documents_to_json(
         self, documents: list[Document], filename: str | Path
     ) -> None:
-        if isinstance(filename, str):
-            filename = Path(filename)
-
-        filename.parent.mkdir(parents=True, exist_ok=True)
-
-        try:
-            with filename.open("w") as f:
-                json.dump(
-                    [
-                        {"page_content": page.page_content, "metadata": page.metadata}
-                        for page in documents
-                    ],
-                    f,
-                    indent=2,
-                )
-        except (PermissionError, IOError) as e:
-            raise RuntimeError(f"Error while exporting json file: {e}")
+        DocumentJsonToolkit.documents_to_json(documents, filename)
 
     async def json_to_documents(self, filename: str | Path) -> list[Document]:
-        if isinstance(filename, str):
-            filename = Path(filename)
-
-        try:
-            with filename.open("r") as f:
-                data = json.load(f)
-                documents = [
-                    Document(
-                        page_content=page["page_content"], metadata=page["metadata"]
-                    )
-                    for page in data
-                ]
-            return documents
-        except (PermissionError, IOError) as e:
-            raise RuntimeError(f"Error while importing json file: {e}")
+        return DocumentJsonToolkit.json_to_documents(filename)
 
     async def _is_valid_pdf(self, file_path: str | Path) -> bool:
         """
