@@ -234,11 +234,14 @@ async def test_documents_to_json_permission_error(mock_llm, sample_documents, tm
     test_file = tmp_path / "test_output.json"
 
     # Mock the Path.open method to raise PermissionError
-    with patch.object(Path, "open", side_effect=PermissionError("Permission denied")):
+    with patch(
+        "src.services.utils.document_toolkit.Path.open",
+        side_effect=PermissionError("Permission denied"),
+    ):
         loader = PdfLoader(llm_model=mock_llm)
         await loader.initialize()
 
-        with pytest.raises(RuntimeError, match="Error while exporting json file"):
+        with pytest.raises(RuntimeError, match="Error while exporting JSON file"):
             await loader.documents_to_json(sample_documents, test_file)
 
 
@@ -285,7 +288,7 @@ async def test_json_to_documents_file_error(mock_llm, tmp_path):
     loader = PdfLoader(llm_model=mock_llm)
     await loader.initialize()
 
-    with pytest.raises(RuntimeError, match="Error while importing json file"):
+    with pytest.raises(RuntimeError, match="Error while importing JSON file"):
         await loader.json_to_documents(test_file)
 
 
