@@ -2,7 +2,7 @@ from typing import List, Optional
 
 from langchain.schema import Document
 
-from src.services.processors.cleaning_strategies import *
+from src.services.cleaners.cleaning_strategies import *
 
 
 class PdfDocumentCleaner:

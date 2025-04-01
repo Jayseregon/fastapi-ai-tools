@@ -1,6 +1,6 @@
 import pytest
 
-from src.services.processors.cleaning_strategies import (
+from src.services.cleaners.cleaning_strategies import (
     CleaningStrategy,
     FigureReferenceStrategy,
     HeaderFooterRemovalStrategy,

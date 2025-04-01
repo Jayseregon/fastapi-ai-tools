@@ -3,24 +3,25 @@ from unittest.mock import AsyncMock
 import pytest
 from langchain.schema import Document
 
-from src.services.processors.cleaning_strategies import (
+from src.services.cleaners.cleaning_strategies import (
     CleaningStrategy,
-    HeaderFooterRemovalStrategy,
-    TableFormattingStrategy,
+    SeticsHeadingCleanupStrategy,
+    SeticsTableFormattingStrategy,
+    SeticsWebCleanupStrategy,
     WhitespaceNormalizationStrategy,
 )
-from src.services.processors.pdf_cleaner import PdfDocumentCleaner
+from src.services.cleaners.setics_cleaner import SeticsDocumentCleaner
 
 
-class TestPdfDocumentCleaner:
-    """Tests for the PdfDocumentCleaner class."""
+class TestSeticsDocumentCleaner:
+    """Tests for the SeticsDocumentCleaner class."""
 
     @pytest.fixture
     def mock_document(self):
         """Create a mock document for testing."""
         return Document(
-            page_content="Test content with header\nPage 1 of 10\nActual content",
-            metadata={"source": "test.pdf"},
+            page_content="Setics User Manual - Version 1.2\nSetics Sttar Advanced Designer | User Manual Version 1.2\nActual content",
+            metadata={"source": "setics_manual.html"},
         )
 
     @pytest.fixture
@@ -28,10 +29,12 @@ class TestPdfDocumentCleaner:
         """Create a list of mock documents for testing."""
         return [
             Document(
-                page_content="Document 1 content", metadata={"source": "doc1.pdf"}
+                page_content="Document 1 content\nEnglish\n\n\nFrançais\n\nMore content",
+                metadata={"source": "setics1.html"},
             ),
             Document(
-                page_content="Document 2 content", metadata={"source": "doc2.pdf"}
+                page_content="Document 2 content\nTable of Contents\n\nEntry 1\nEntry 2",
+                metadata={"source": "setics2.html"},
             ),
         ]
 
@@ -39,25 +42,22 @@ class TestPdfDocumentCleaner:
     def mock_strategy(self):
         """Create a mock cleaning strategy."""
         strategy = AsyncMock(spec=CleaningStrategy)
-        strategy.clean.return_value = "Cleaned content"
-        strategy.name = "MockStrategy"
+        strategy.clean.return_value = "Cleaned Setics content"
+        strategy.name = "MockSeticsStrategy"
         return strategy
 
     def test_init_default_strategies(self):
         """Test initializing with default strategies."""
-        cleaner = PdfDocumentCleaner()
+        cleaner = SeticsDocumentCleaner()
         assert len(cleaner.strategies) > 0
-        assert any(
-            isinstance(s, HeaderFooterRemovalStrategy) for s in cleaner.strategies
-        )
+        assert any(isinstance(s, SeticsWebCleanupStrategy) for s in cleaner.strategies)
         assert any(
             isinstance(s, WhitespaceNormalizationStrategy) for s in cleaner.strategies
         )
-        assert any(isinstance(s, TableFormattingStrategy) for s in cleaner.strategies)
 
     def test_init_custom_strategies(self, mock_strategy):
         """Test initializing with custom strategies."""
-        cleaner = PdfDocumentCleaner(strategies=[mock_strategy])
+        cleaner = SeticsDocumentCleaner(strategies=[mock_strategy])
         assert len(cleaner.strategies) == 1
         assert cleaner.strategies[0] == mock_strategy
 
@@ -65,13 +65,13 @@ class TestPdfDocumentCleaner:
     async def test_clean_document(self, mock_document, mock_strategy):
         """Test cleaning a single document."""
         # Arrange
-        cleaner = PdfDocumentCleaner(strategies=[mock_strategy])
+        cleaner = SeticsDocumentCleaner(strategies=[mock_strategy])
 
         # Act
         result = await cleaner.clean_document(mock_document)
 
         # Assert
-        assert result.page_content == "Cleaned content"
+        assert result.page_content == "Cleaned Setics content"
         assert result.metadata == mock_document.metadata
         mock_strategy.clean.assert_called_once_with(mock_document.page_content)
 
@@ -79,14 +79,14 @@ class TestPdfDocumentCleaner:
     async def test_clean_documents(self, mock_documents, mock_strategy):
         """Test cleaning multiple documents."""
         # Arrange
-        cleaner = PdfDocumentCleaner(strategies=[mock_strategy])
+        cleaner = SeticsDocumentCleaner(strategies=[mock_strategy])
 
         # Act
         results = await cleaner.clean_documents(mock_documents)
 
         # Assert
         assert len(results) == 2
-        assert all(doc.page_content == "Cleaned content" for doc in results)
+        assert all(doc.page_content == "Cleaned Setics content" for doc in results)
         assert results[0].metadata == mock_documents[0].metadata
         assert results[1].metadata == mock_documents[1].metadata
         assert mock_strategy.clean.call_count == 2
@@ -96,27 +96,27 @@ class TestPdfDocumentCleaner:
         """Test that multiple strategies are applied in the correct order."""
         # Arrange
         first_strategy = AsyncMock(spec=CleaningStrategy)
-        first_strategy.clean.return_value = "First strategy applied"
-        first_strategy.name = "FirstStrategy"
+        first_strategy.clean.return_value = "First Setics strategy applied"
+        first_strategy.name = "FirstSeticsStrategy"
 
         second_strategy = AsyncMock(spec=CleaningStrategy)
-        second_strategy.clean.return_value = "Both strategies applied"
-        second_strategy.name = "SecondStrategy"
+        second_strategy.clean.return_value = "Both Setics strategies applied"
+        second_strategy.name = "SecondSeticsStrategy"
 
-        cleaner = PdfDocumentCleaner(strategies=[first_strategy, second_strategy])
+        cleaner = SeticsDocumentCleaner(strategies=[first_strategy, second_strategy])
 
         # Act
         result = await cleaner.clean_document(mock_document)
 
         # Assert
-        assert result.page_content == "Both strategies applied"
+        assert result.page_content == "Both Setics strategies applied"
         first_strategy.clean.assert_called_once_with(mock_document.page_content)
-        second_strategy.clean.assert_called_once_with("First strategy applied")
+        second_strategy.clean.assert_called_once_with("First Setics strategy applied")
 
     def test_add_strategy(self, mock_strategy):
         """Test adding a strategy."""
         # Arrange
-        cleaner = PdfDocumentCleaner()  # Use default constructor instead of empty list
+        cleaner = SeticsDocumentCleaner()
         initial_count = len(cleaner.strategies)
 
         # Act
@@ -124,25 +124,23 @@ class TestPdfDocumentCleaner:
 
         # Assert
         assert len(cleaner.strategies) == initial_count + 1
-        assert (
-            cleaner.strategies[-1] == mock_strategy
-        )  # Check that our strategy was added at the end
+        assert cleaner.strategies[-1] == mock_strategy
 
     def test_remove_strategy_by_name(self):
         """Test removing a strategy by name."""
         # Arrange
-        strategy1 = HeaderFooterRemovalStrategy()
+        strategy1 = SeticsWebCleanupStrategy()
         strategy2 = WhitespaceNormalizationStrategy()
-        cleaner = PdfDocumentCleaner(strategies=[strategy1, strategy2])
+        cleaner = SeticsDocumentCleaner(strategies=[strategy1, strategy2])
         assert len(cleaner.strategies) == 2
 
         # Act
-        cleaner.remove_strategy("HeaderFooterRemovalStrategy")
+        cleaner.remove_strategy("SeticsWebCleanupStrategy")
 
         # Assert
         assert len(cleaner.strategies) == 1
         assert all(
-            not isinstance(s, HeaderFooterRemovalStrategy) for s in cleaner.strategies
+            not isinstance(s, SeticsWebCleanupStrategy) for s in cleaner.strategies
         )
         assert any(
             isinstance(s, WhitespaceNormalizationStrategy) for s in cleaner.strategies
@@ -151,27 +149,25 @@ class TestPdfDocumentCleaner:
     def test_remove_nonexistent_strategy(self):
         """Test removing a strategy that doesn't exist."""
         # Arrange
-        cleaner = PdfDocumentCleaner()
+        cleaner = SeticsDocumentCleaner()
         initial_strategy_count = len(cleaner.strategies)
 
         # Act
         cleaner.remove_strategy("NonexistentStrategy")
 
         # Assert
-        assert (
-            len(cleaner.strategies) == initial_strategy_count
-        )  # Should remain unchanged
+        assert len(cleaner.strategies) == initial_strategy_count
 
     @pytest.mark.asyncio
     async def test_clean_empty_document(self):
         """Test cleaning an empty document."""
         # Arrange
-        empty_doc = Document(page_content="", metadata={"source": "empty.pdf"})
+        empty_doc = Document(page_content="", metadata={"source": "empty_setics.html"})
         mock_strategy = AsyncMock(spec=CleaningStrategy)
         mock_strategy.clean.return_value = ""
         mock_strategy.name = "MockStrategy"
 
-        cleaner = PdfDocumentCleaner(strategies=[mock_strategy])
+        cleaner = SeticsDocumentCleaner(strategies=[mock_strategy])
 
         # Act
         result = await cleaner.clean_document(empty_doc)
@@ -182,28 +178,48 @@ class TestPdfDocumentCleaner:
         mock_strategy.clean.assert_called_once_with("")
 
     @pytest.mark.asyncio
+    async def test_uncomment_additional_strategies(self):
+        """Test adding commented-out strategies from the source file."""
+        # Arrange
+        cleaner = SeticsDocumentCleaner()
+        initial_count = len(cleaner.strategies)
+
+        # Act
+        cleaner.add_strategy(SeticsTableFormattingStrategy())
+        cleaner.add_strategy(SeticsHeadingCleanupStrategy())
+
+        # Assert
+        assert len(cleaner.strategies) == initial_count + 2
+        assert any(
+            isinstance(s, SeticsTableFormattingStrategy) for s in cleaner.strategies
+        )
+        assert any(
+            isinstance(s, SeticsHeadingCleanupStrategy) for s in cleaner.strategies
+        )
+
+    @pytest.mark.asyncio
     async def test_real_cleaning_integration(self):
         """Integration test with real cleaning strategies."""
         # Arrange
-        # Add a newline before the section heading to match SectionHeadingStrategy's regex pattern
         test_doc = Document(
-            page_content="Header\nPage 1 of 5\n\n\n\n\n1. Introduction\n\nThis is    some text   with    excessive    spaces.\n\n\n\n",
-            metadata={"source": "test.pdf"},
+            page_content=(
+                "User Manual - Version 1.2\n"
+                "Setics Sttar Advanced Designer | User Manual Version 1.2\n\n"
+                "Content with    excessive    spaces\n\n\n\n"
+                "English\n\n\nFrançais\n\n"
+                "Need more help with this? Support & Assistance"
+            ),
+            metadata={"source": "setics_test.html"},
         )
-        cleaner = PdfDocumentCleaner()  # Use default strategies
+        cleaner = SeticsDocumentCleaner()  # Use default strategies
 
         # Act
         result = await cleaner.clean_document(test_doc)
 
         # Assert
-        assert (
-            "Header\nPage 1 of 5" not in result.page_content
-        )  # Header should be removed
-
-        # Check for normalized whitespace instead of specific heading formatting
+        # Check that whitespace is normalized
         assert "excessive    spaces" not in result.page_content
         assert "\n\n\n\n" not in result.page_content
 
-        # If heading formatting is important for the test, modify the input pattern to match
-        # what SectionHeadingStrategy expects or check an alternate assertion
-        assert "1. Introduction" in result.page_content  # Section content is preserved
+        # Content is preserved but cleaned
+        assert "Content" in result.page_content
