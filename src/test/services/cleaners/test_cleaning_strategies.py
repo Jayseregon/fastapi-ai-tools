@@ -6,9 +6,8 @@ from src.services.cleaners.cleaning_strategies import (
     HeaderFooterRemovalStrategy,
     ImageDescriptionStrategy,
     SectionHeadingStrategy,
-    SeticsHeadingCleanupStrategy,
-    SeticsTableFormattingStrategy,
     SeticsWebCleanupStrategy,
+    SeticsWebCleanupStrategyFR,
     TableFormattingStrategy,
     TableOfContentsStrategy,
     WhitespaceNormalizationStrategy,
@@ -71,9 +70,7 @@ class TestHeaderFooterRemovalStrategy:
     @pytest.mark.asyncio
     async def test_multiple_headers(self, strategy):
         """Test handling of text with multiple headers."""
-        text = (
-            "Header 1\nPage 1 of 10\nContent 1\n\n" "Header 2\nPage 2 of 10\nContent 2"
-        )
+        text = "Header 1\nPage 1 of 10\nContent 1\n\nHeader 2\nPage 2 of 10\nContent 2"
         result = await strategy.clean(text)
         assert "Content 1" in result
         assert "Content 2" in result
@@ -330,60 +327,67 @@ class TestSeticsWebCleanupStrategy:
         assert "More content" in result
 
 
-class TestSeticsTableFormattingStrategy:
-    """Tests for the SeticsTableFormattingStrategy class."""
+class TestSeticsWebCleanupStrategyFR:
+    """Tests for the SeticsWebCleanupStrategyFR class."""
 
     @pytest.fixture
     def strategy(self):
-        """Create a SeticsTableFormattingStrategy instance."""
-        return SeticsTableFormattingStrategy()
+        """Create a SeticsWebCleanupStrategyFR instance."""
+        return SeticsWebCleanupStrategyFR()
 
     @pytest.mark.asyncio
-    async def test_command_table_formatting(self, strategy):
-        """Test formatting of command tables."""
+    async def test_french_toc_removal(self, strategy):
+        """Test removal of French table of contents."""
         text = (
-            "\n\nCommand \nDescription \nKeyboard shortcut \n\n\n"  # Fix invalid escape sequences
-            "Cut\n"
-            "Remove the selected text\n"
-            "Ctrl+X\n\n"
-            "Copy\n"
-            "Copy the selected text\n"
-            "Ctrl+C\n\n\n\n"
+            "Some content\n\n\n\nTable des matières\n\n"
+            "Entry 1\nEntry 2\n\n\n\n\n1.1. Section\nMore content"
         )
-
         result = await strategy.clean(text)
-        assert "| Command | Description | Keyboard shortcut |" in result
-        # Check for header presence instead of specific rows
-        assert "**Table: Commands**" in result
-
-
-class TestSeticsHeadingCleanupStrategy:
-    """Tests for the SeticsHeadingCleanupStrategy class."""
-
-    @pytest.fixture
-    def strategy(self):
-        """Create a SeticsHeadingCleanupStrategy instance."""
-        return SeticsHeadingCleanupStrategy()
+        assert "Some content" in result
+        assert "1.1. Section" in result
+        assert "More content" in result
+        assert "Table des matières" not in result
 
     @pytest.mark.asyncio
-    async def test_section_reference_cleanup(self, strategy):
-        """Test cleanup of section references."""
-        text = "\n1.1. First Section\n\n\n\n\n1.2. Second Section"
+    async def test_french_language_selector_removal(self, strategy):
+        """Test removal of French language selector."""
+        text = "Content\nFrançais\n\n\nEnglish\n\nMore content"
         result = await strategy.clean(text)
-        assert (
-            "## 1.1. First Section" in result
-        )  # Check for formatted heading instead of original
-        assert "1.2. Second Section" in result  # This one remains unformatted
+        assert "Français\n\n\nEnglish" not in result
+        assert "Content" in result
+        assert "More content" in result
 
     @pytest.mark.asyncio
-    async def test_heading_formatting(self, strategy):
-        """Test formatting of section headings."""
-        # Add newlines before and after the heading to match the regex pattern
-        text = "\n1. INTRODUCTION\n"  # Added trailing newline to match (?=\n) in regex
+    async def test_french_footer_removal(self, strategy):
+        """Test removal of French footer sections."""
+        text = (
+            "Content\nBesoin d'aide supplémentaire avec ce sujet? "
+            "Support & Assistance\nCopyright © 2023 Setics\nMore text"
+        )
         result = await strategy.clean(text)
-        assert "# 1. INTRODUCTION" in result
+        assert "Besoin d'aide supplémentaire" not in result
+        assert "Copyright © 2023 Setics" not in result
+        assert "Content" in result
 
-        # Similar fix for the subheading test
-        text = "\n1.2.3. DETAILED SUBSECTION\n"  # Added trailing newline
+    @pytest.mark.asyncio
+    async def test_french_feedback_form_removal(self, strategy):
+        """Test removal of French feedback form."""
+        text = "Content\n× Merci pour vos commentaires.\nMore content"
         result = await strategy.clean(text)
-        assert "### 1.2.3. DETAILED SUBSECTION" in result
+        assert "× Merci pour vos commentaires." not in result
+        assert "Content" in result
+        assert "More content" in result
+
+    @pytest.mark.asyncio
+    async def test_french_section_heading_formatting(self, strategy):
+        """Test formatting of French section headings."""
+        text = (
+            "\n1.2.3. Titre de la section\n\n\n\n"
+            "1.2.4. Section suivante\n\n\n\n"
+            "1.2.5. Autre section\n"
+        )
+        result = await strategy.clean(text)
+        # Test that excessive newlines are removed
+        assert "\n\n\n\n" not in result
+        # The heading should be detected and formatted
+        assert "1.2.3. Titre de la section" in result

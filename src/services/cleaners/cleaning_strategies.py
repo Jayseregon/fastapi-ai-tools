@@ -27,19 +27,10 @@ class HeaderFooterRemovalStrategy(CleaningStrategy):
             re.DOTALL,  # Make dot match newlines to capture entire header block
         )
 
-        # # Optional: Pattern for footers if needed
-        # self._footer_pattern = re.compile(
-        #     r"\n.*?Confidential.*?$",
-        #     re.DOTALL
-        # )
-
     async def clean(self, text: str) -> str:
         """Remove headers and footers from text."""
         # Remove header (everything from start to page numbering)
         cleaned_text = self._header_pattern.sub("", text)
-
-        # Optionally remove footer if present
-        # cleaned_text = self._footer_pattern.sub("", cleaned_text)
 
         return cleaned_text
 
@@ -399,6 +390,9 @@ class SeticsWebCleanupStrategy(CleaningStrategy):
             re.DOTALL,
         )
 
+        # Pattern to handle stray tab characters
+        self._tab_pattern = re.compile(r"\t")
+
     async def clean(self, text: str) -> str:
         """Clean up Setics web documentation."""
         # Remove entire table of contents section
@@ -421,6 +415,9 @@ class SeticsWebCleanupStrategy(CleaningStrategy):
 
         # Remove feedback form
         text = self._feedback_pattern.sub("", text)
+
+        # Replace tab characters with a space for better text quality
+        text = self._tab_pattern.sub(" ", text)
 
         # Handle section navigation headers
         # First identify the primary section heading and format it properly
@@ -454,75 +451,110 @@ class SeticsWebCleanupStrategy(CleaningStrategy):
         return text.strip()
 
 
-class SeticsTableFormattingStrategy(CleaningStrategy):
-    """Strategy to normalize tables in Setics documentation."""
-
-    async def clean(self, text: str) -> str:
-        """Clean up tables in Setics documentation."""
-        # The command tables have a unique format with columns separated by newlines
-        table_pattern = re.compile(
-            r"(\n\nCommand\s+\nDescription\s+\nKeyboard shortcut\s+\n\n\n)(.*?)(\n\n\n)",
-            re.DOTALL,
-        )
-
-        def format_command_table(match):
-            header = "| Command | Description | Keyboard shortcut |\n|---------|-------------|------------------|\n"
-            content = match.group(2)
-
-            # Process each row
-            rows = re.findall(
-                r"\s+([^\n]+)\s+\n\s+([^\n]+(?:\n[^\n]+)*)\s+\n\s+([^\n]*)\s+\n\n",
-                content,
-            )
-            formatted_rows = []
-
-            for command, desc, shortcut in rows:
-                # Clean up description - replace internal newlines with spaces
-                desc = re.sub(r"\n\s+", " ", desc)
-                formatted_rows.append(
-                    f"| {command.strip()} | {desc.strip()} | {shortcut.strip()} |"
-                )
-
-            return (
-                "\n\n**Table: Commands**\n\n"
-                + header
-                + "\n".join(formatted_rows)
-                + "\n\n"
-            )
-
-        # Apply table formatting
-        return table_pattern.sub(format_command_table, text)
-
-
-class SeticsHeadingCleanupStrategy(CleaningStrategy):
-    """Strategy to format section headings in Setics documentation."""
+class SeticsWebCleanupStrategyFR(CleaningStrategy):
+    """Strategy to clean up Setics web documentation pages - FRENCH."""
 
     def __init__(self):
-        # Pattern to match section references at the top/bottom of pages
-        self._section_ref_pattern = re.compile(
-            r"(\n\d+\.\d+(?:\.\d+)*\.\s+[^\n]+)\s+\n+\s+\n+\s+\n+\s+\n+(\d+\.\d+(?:\.\d+)*\.\s+[^\n]+)",
+        """Initialize Setics web document cleanup patterns for FRENCH docs."""
+        # Pattern to remove the entire repeated table of contents section
+        self._toc_pattern = re.compile(
+            r"Table des matières\n\n+.*?(?=\n\n\n\n\n\d+\.\d+\.|\n\n\n\nRevision)",
             re.DOTALL,
         )
 
-        # Pattern to format actual section headings
-        self._heading_pattern = re.compile(
-            r"(?:\n|^)(\d+(?:\.\d+){0,4})\.\s+([A-Z][^\n]+)(?=\n)",
+        # Pattern to remove header navigation and titles
+        self._header_pattern = re.compile(
+            r"^\s*\n+.*?User Manual - Version \d+\.\d+\n+.*?Setics Sttar Advanced Designer\s+\|"
+            r"\s+User Manual\s+Version \d+\.\d+",
+            re.DOTALL,
         )
 
-    async def clean(self, text: str) -> str:
-        """Format section headings and clean up section references."""
-        # Remove redundant section references that appear at page transitions
-        text = self._section_ref_pattern.sub(r"\1", text)
+        # Pattern to remove language selector
+        self._lang_selector_pattern = re.compile(
+            r"Français\s+\n+\s*\n+English\n+", re.DOTALL
+        )
 
-        # Format actual section headings with markdown
-        def format_heading(match):
-            section_num = match.group(1)
-            title = match.group(2)
+        # Pattern to remove footer sections
+        self._footer_pattern = re.compile(
+            r"Besoin d'aide supplémentaire avec ce sujet\?\s+Support & Assistance.*?Copyright © \d{4} Setics",
+            re.DOTALL,
+        )
+
+        # Pattern to remove version information at start of document
+        self._version_pattern = re.compile(r"^Version \d+\.\d+\s*\n+", re.MULTILINE)
+
+        # Pattern to remove revision info completely
+        self._revision_pattern = re.compile(
+            r"Revision:\s+\d+\s+Last modified:\s+\d+ \w+ \d{4}", re.DOTALL
+        )
+
+        # Pattern to remove feedback form
+        self._feedback_pattern = re.compile(
+            r"× Merci pour vos commentaires\.",
+        )
+
+        # New pattern to handle section navigation references
+        self._section_nav_pattern = re.compile(
+            r"(\n\n+\d+\.\d+(?:\.\d+)*\.\s+[^\n]+)\s+\n\n+\n\n+(\d+\.\d+(?:\.\d+)*\.\s+[^\n]+\s+\n\n+\n\n+\d+\.\d+(?:\.\d+)*\.\s+[^\n]+)",
+            re.DOTALL,
+        )
+
+        # Pattern to handle tab characters
+        self._tab_pattern = re.compile(r"\t")
+
+    async def clean(self, text: str) -> str:
+        """Clean up Setics web documentation - FRENCH."""
+        # Remove entire table of contents section
+        text = self._toc_pattern.sub("", text)
+
+        # Remove header boilerplate
+        text = self._header_pattern.sub("", text)
+
+        # Remove language selector
+        text = self._lang_selector_pattern.sub("", text)
+
+        # Remove version information at start
+        text = self._version_pattern.sub("", text)
+
+        # Remove revision info completely
+        text = self._revision_pattern.sub("", text)
+
+        # Remove footer sections
+        text = self._footer_pattern.sub("", text)
+
+        # Remove feedback form
+        text = self._feedback_pattern.sub("", text)
+
+        # Replace tab characters with a space for better text quality
+        text = self._tab_pattern.sub(" ", text)
+
+        # Handle section navigation headers
+        # First identify the primary section heading and format it properly
+        primary_heading_match = re.search(
+            r"\n(\d+\.\d+(?:\.\d+)*)\.\s+([^\n]+)\s+\n", text
+        )
+
+        if primary_heading_match:
+            section_num = primary_heading_match.group(1)
+            title = primary_heading_match.group(2)
 
             # Determine heading level based on section number depth
             level = section_num.count(".") + 1
             heading_marks = "#" * min(level, 6)
 
-            return f"\n\n{heading_marks} {section_num}. {title}\n\n"
+            # Create properly formatted heading
+            formatted_heading = f"{heading_marks} {section_num}. {title}"
 
-        return self._heading_pattern.sub(format_heading, text)
+            # Find and remove the navigation section that contains multiple section references
+            nav_section_pattern = re.compile(
+                r"(\n\n+\d+\.\d+(?:\.\d+)*\.\s+[^\n]+\s+\n\n+\n\n+\d+\.\d+(?:\.\d+)*\.\s+[^\n]+\s+\n\n+\n\n+\d+\.\d+(?:\.\d+)*\.\s+[^\n]+)",
+                re.DOTALL,
+            )
+
+            text = nav_section_pattern.sub(f"\n\n{formatted_heading}\n\n", text)
+
+        # Collapse sequences of multiple newlines to no more than 2
+        text = re.sub(r"\n{3,}", "\n\n", text)
+
+        # Trim leading/trailing whitespace
+        return text.strip()

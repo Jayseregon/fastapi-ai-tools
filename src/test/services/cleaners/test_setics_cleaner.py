@@ -5,9 +5,8 @@ from langchain.schema import Document
 
 from src.services.cleaners.cleaning_strategies import (
     CleaningStrategy,
-    SeticsHeadingCleanupStrategy,
-    SeticsTableFormattingStrategy,
     SeticsWebCleanupStrategy,
+    SeticsWebCleanupStrategyFR,
     WhitespaceNormalizationStrategy,
 )
 from src.services.cleaners.setics_cleaner import SeticsDocumentCleaner
@@ -25,6 +24,14 @@ class TestSeticsDocumentCleaner:
         )
 
     @pytest.fixture
+    def mock_document_fr(self):
+        """Create a mock French document for testing."""
+        return Document(
+            page_content="Setics Manuel Utilisateur - Version 1.2\nSetics Sttar Advanced Designer | Manuel Utilisateur Version 1.2\nContenu actuel",
+            metadata={"source": "setics_manual_fr.html", "language": "fr"},
+        )
+
+    @pytest.fixture
     def mock_documents(self):
         """Create a list of mock documents for testing."""
         return [
@@ -34,7 +41,7 @@ class TestSeticsDocumentCleaner:
             ),
             Document(
                 page_content="Document 2 content\nTable of Contents\n\nEntry 1\nEntry 2",
-                metadata={"source": "setics2.html"},
+                metadata={"source": "setics2.html", "language": "fr"},
             ),
         ]
 
@@ -49,114 +56,185 @@ class TestSeticsDocumentCleaner:
     def test_init_default_strategies(self):
         """Test initializing with default strategies."""
         cleaner = SeticsDocumentCleaner()
-        assert len(cleaner.strategies) > 0
-        assert any(isinstance(s, SeticsWebCleanupStrategy) for s in cleaner.strategies)
+
+        # Check default language strategies
+        assert "default" in cleaner.language_strategies
+        assert "fr" in cleaner.language_strategies
+
+        # Check default strategies
+        default_strategies = cleaner.language_strategies["default"]
+        assert len(default_strategies) > 0
+        assert any(isinstance(s, SeticsWebCleanupStrategy) for s in default_strategies)
         assert any(
-            isinstance(s, WhitespaceNormalizationStrategy) for s in cleaner.strategies
+            isinstance(s, WhitespaceNormalizationStrategy) for s in default_strategies
         )
 
-    def test_init_custom_strategies(self, mock_strategy):
-        """Test initializing with custom strategies."""
-        cleaner = SeticsDocumentCleaner(strategies=[mock_strategy])
-        assert len(cleaner.strategies) == 1
-        assert cleaner.strategies[0] == mock_strategy
+        # Check FR strategies
+        fr_strategies = cleaner.language_strategies["fr"]
+        assert len(fr_strategies) > 0
+        assert any(isinstance(s, SeticsWebCleanupStrategyFR) for s in fr_strategies)
+        assert any(
+            isinstance(s, WhitespaceNormalizationStrategy) for s in fr_strategies
+        )
+
+        # Check custom strategies
+        assert len(cleaner.custom_strategies) == 0
+
+    def test_get_strategies_for_language(self):
+        """Test getting strategies for specific languages."""
+        cleaner = SeticsDocumentCleaner()
+
+        # Default language
+        default_strategies = cleaner.get_strategies_for_language("default")
+        assert any(isinstance(s, SeticsWebCleanupStrategy) for s in default_strategies)
+
+        # French language
+        fr_strategies = cleaner.get_strategies_for_language("fr")
+        assert any(isinstance(s, SeticsWebCleanupStrategyFR) for s in fr_strategies)
+
+        # Unknown language should return default
+        unknown_strategies = cleaner.get_strategies_for_language("unknown")
+        assert any(isinstance(s, SeticsWebCleanupStrategy) for s in unknown_strategies)
 
     @pytest.mark.asyncio
-    async def test_clean_document(self, mock_document, mock_strategy):
-        """Test cleaning a single document."""
+    async def test_clean_document_default_language(self, mock_document, mock_strategy):
+        """Test cleaning a single document with default language."""
         # Arrange
-        cleaner = SeticsDocumentCleaner(strategies=[mock_strategy])
+        cleaner = SeticsDocumentCleaner()
+        cleaner.add_strategy(mock_strategy)  # Add to custom strategies
 
         # Act
         result = await cleaner.clean_document(mock_document)
 
         # Assert
-        assert result.page_content == "Cleaned Setics content"
         assert result.metadata == mock_document.metadata
-        mock_strategy.clean.assert_called_once_with(mock_document.page_content)
+        mock_strategy.clean.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_clean_documents(self, mock_documents, mock_strategy):
-        """Test cleaning multiple documents."""
+    async def test_clean_document_french(self, mock_document_fr, mock_strategy):
+        """Test cleaning a document with French language."""
         # Arrange
-        cleaner = SeticsDocumentCleaner(strategies=[mock_strategy])
+        cleaner = SeticsDocumentCleaner()
+        cleaner.add_strategy(mock_strategy, language="fr")
+
+        # Act
+        result = await cleaner.clean_document(mock_document_fr)
+
+        # Assert
+        assert result.metadata == mock_document_fr.metadata
+        mock_strategy.clean.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_clean_documents(self, mock_documents):
+        """Test cleaning multiple documents with different languages."""
+        # Arrange
+        cleaner = SeticsDocumentCleaner()
+
+        # Create mock strategies for tracking calls
+        default_mock = AsyncMock(spec=CleaningStrategy)
+        default_mock.clean.return_value = "Default cleaned"
+        default_mock.name = "DefaultMock"
+
+        fr_mock = AsyncMock(spec=CleaningStrategy)
+        fr_mock.clean.return_value = "French cleaned"
+        fr_mock.name = "FrenchMock"
+
+        cleaner.add_strategy(default_mock, language="default")
+        cleaner.add_strategy(fr_mock, language="fr")
 
         # Act
         results = await cleaner.clean_documents(mock_documents)
 
         # Assert
         assert len(results) == 2
-        assert all(doc.page_content == "Cleaned Setics content" for doc in results)
-        assert results[0].metadata == mock_documents[0].metadata
-        assert results[1].metadata == mock_documents[1].metadata
-        assert mock_strategy.clean.call_count == 2
+        default_mock.clean.assert_called_once()
+        fr_mock.clean.assert_called_once()
 
-    @pytest.mark.asyncio
-    async def test_multiple_strategies_applied_in_order(self, mock_document):
-        """Test that multiple strategies are applied in the correct order."""
-        # Arrange
-        first_strategy = AsyncMock(spec=CleaningStrategy)
-        first_strategy.clean.return_value = "First Setics strategy applied"
-        first_strategy.name = "FirstSeticsStrategy"
-
-        second_strategy = AsyncMock(spec=CleaningStrategy)
-        second_strategy.clean.return_value = "Both Setics strategies applied"
-        second_strategy.name = "SecondSeticsStrategy"
-
-        cleaner = SeticsDocumentCleaner(strategies=[first_strategy, second_strategy])
-
-        # Act
-        result = await cleaner.clean_document(mock_document)
-
-        # Assert
-        assert result.page_content == "Both Setics strategies applied"
-        first_strategy.clean.assert_called_once_with(mock_document.page_content)
-        second_strategy.clean.assert_called_once_with("First Setics strategy applied")
-
-    def test_add_strategy(self, mock_strategy):
-        """Test adding a strategy."""
+    def test_add_strategy_to_language(self, mock_strategy):
+        """Test adding a strategy to a specific language."""
         # Arrange
         cleaner = SeticsDocumentCleaner()
-        initial_count = len(cleaner.strategies)
+        initial_fr_count = len(cleaner.language_strategies["fr"])
+
+        # Act
+        cleaner.add_strategy(mock_strategy, language="fr")
+
+        # Assert
+        assert len(cleaner.language_strategies["fr"]) == initial_fr_count + 1
+        assert cleaner.language_strategies["fr"][-1] == mock_strategy
+
+    def test_add_strategy_custom(self, mock_strategy):
+        """Test adding a strategy to custom strategies."""
+        # Arrange
+        cleaner = SeticsDocumentCleaner()
+        initial_count = len(cleaner.custom_strategies)
 
         # Act
         cleaner.add_strategy(mock_strategy)
 
         # Assert
-        assert len(cleaner.strategies) == initial_count + 1
-        assert cleaner.strategies[-1] == mock_strategy
+        assert len(cleaner.custom_strategies) == initial_count + 1
+        assert cleaner.custom_strategies[-1] == mock_strategy
 
-    def test_remove_strategy_by_name(self):
-        """Test removing a strategy by name."""
+    def test_add_strategy_new_language(self, mock_strategy):
+        """Test adding a strategy to a new language."""
         # Arrange
-        strategy1 = SeticsWebCleanupStrategy()
-        strategy2 = WhitespaceNormalizationStrategy()
-        cleaner = SeticsDocumentCleaner(strategies=[strategy1, strategy2])
-        assert len(cleaner.strategies) == 2
+        cleaner = SeticsDocumentCleaner()
 
         # Act
-        cleaner.remove_strategy("SeticsWebCleanupStrategy")
+        cleaner.add_strategy(mock_strategy, language="es")
 
         # Assert
-        assert len(cleaner.strategies) == 1
+        assert "es" in cleaner.language_strategies
+        assert len(cleaner.language_strategies["es"]) == 1
+        assert cleaner.language_strategies["es"][0] == mock_strategy
+
+    def test_remove_strategy_by_name_from_language(self):
+        """Test removing a strategy by name from a specific language."""
+        # Arrange
+        cleaner = SeticsDocumentCleaner()
+        initial_fr_count = len(cleaner.language_strategies["fr"])
+
+        # Act
+        cleaner.remove_strategy("SeticsWebCleanupStrategyFR", language="fr")
+
+        # Assert
+        assert len(cleaner.language_strategies["fr"]) < initial_fr_count
         assert all(
-            not isinstance(s, SeticsWebCleanupStrategy) for s in cleaner.strategies
+            not isinstance(s, SeticsWebCleanupStrategyFR)
+            for s in cleaner.language_strategies["fr"]
         )
-        assert any(
-            isinstance(s, WhitespaceNormalizationStrategy) for s in cleaner.strategies
-        )
+
+    def test_remove_strategy_by_name_from_custom(self, mock_strategy):
+        """Test removing a strategy by name from custom strategies."""
+        # Arrange
+        cleaner = SeticsDocumentCleaner()
+        cleaner.add_strategy(mock_strategy)
+        initial_count = len(cleaner.custom_strategies)
+
+        # Act
+        cleaner.remove_strategy("MockSeticsStrategy")
+
+        # Assert
+        assert len(cleaner.custom_strategies) == initial_count - 1
+        assert all(s.name != "MockSeticsStrategy" for s in cleaner.custom_strategies)
 
     def test_remove_nonexistent_strategy(self):
         """Test removing a strategy that doesn't exist."""
         # Arrange
         cleaner = SeticsDocumentCleaner()
-        initial_strategy_count = len(cleaner.strategies)
+        initial_default_count = len(cleaner.language_strategies["default"])
+        initial_fr_count = len(cleaner.language_strategies["fr"])
+        initial_custom_count = len(cleaner.custom_strategies)
 
         # Act
         cleaner.remove_strategy("NonexistentStrategy")
+        cleaner.remove_strategy("NonexistentStrategy", language="fr")
 
         # Assert
-        assert len(cleaner.strategies) == initial_strategy_count
+        assert len(cleaner.language_strategies["default"]) == initial_default_count
+        assert len(cleaner.language_strategies["fr"]) == initial_fr_count
+        assert len(cleaner.custom_strategies) == initial_custom_count
 
     @pytest.mark.asyncio
     async def test_clean_empty_document(self):
@@ -167,7 +245,8 @@ class TestSeticsDocumentCleaner:
         mock_strategy.clean.return_value = ""
         mock_strategy.name = "MockStrategy"
 
-        cleaner = SeticsDocumentCleaner(strategies=[mock_strategy])
+        cleaner = SeticsDocumentCleaner()
+        cleaner.add_strategy(mock_strategy)
 
         # Act
         result = await cleaner.clean_document(empty_doc)
@@ -176,26 +255,6 @@ class TestSeticsDocumentCleaner:
         assert result.page_content == ""
         assert result.metadata == empty_doc.metadata
         mock_strategy.clean.assert_called_once_with("")
-
-    @pytest.mark.asyncio
-    async def test_uncomment_additional_strategies(self):
-        """Test adding commented-out strategies from the source file."""
-        # Arrange
-        cleaner = SeticsDocumentCleaner()
-        initial_count = len(cleaner.strategies)
-
-        # Act
-        cleaner.add_strategy(SeticsTableFormattingStrategy())
-        cleaner.add_strategy(SeticsHeadingCleanupStrategy())
-
-        # Assert
-        assert len(cleaner.strategies) == initial_count + 2
-        assert any(
-            isinstance(s, SeticsTableFormattingStrategy) for s in cleaner.strategies
-        )
-        assert any(
-            isinstance(s, SeticsHeadingCleanupStrategy) for s in cleaner.strategies
-        )
 
     @pytest.mark.asyncio
     async def test_real_cleaning_integration(self):
