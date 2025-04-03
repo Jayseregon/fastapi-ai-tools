@@ -2,6 +2,13 @@ import logging
 from typing import ClassVar, Dict, List, Optional, Union
 from urllib.parse import urlparse
 
+from langchain_community.document_loaders.parsers.images import LLMImageBlobParser
+from langchain_core.documents import Document
+from langchain_core.documents.base import Blob
+from langchain_core.prompts import PromptTemplate
+from langchain_openai import ChatOpenAI
+
+from src.configs.env_config import config
 from src.services.loaders.lib import WebAuthentication
 from src.services.loaders.lib.web_image_processor import WebImageProcessor
 from src.services.loaders.web.base_web_loader import BaseWebLoader
@@ -225,7 +232,7 @@ class WebImageLoader(BaseWebLoader):
 
         return params
 
-    async def extract_image_urls(
+    async def _extract_image_urls_from_pages(
         self, urls: Union[str, List[str]], continue_on_failure: bool = False
     ) -> List[Dict[str, str]]:
         """
@@ -273,6 +280,105 @@ class WebImageLoader(BaseWebLoader):
                     raise
 
         return result
+
+    def _custom_prompt(self) -> PromptTemplate:
+        custom_prompt_template = """You are an advanced image analysis assistant tasked with extracting and describing visual content for a retrieval-augmented generation system.
+
+        ## Part 1: Concise Summary (50-75 words)
+        Provide a concise summary that captures the image's core purpose and content. Focus on what the image represents functionally rather than just visually. Identify the primary information being conveyed.
+
+        ## Part 2: Visual Description (100-150 words)
+        Describe the image with these key aspects:
+        - Type of image (screenshot, diagram, chart, photo, etc.) or combination if mixed format
+        - Main subject and its purpose or function
+        - Key visual elements, their relationships, and hierarchical organization
+        - For screenshots: interface purpose and main controls
+        - For diagrams/charts: what information is being conveyed and key relationships
+        - For flowcharts/processes: sequence, decision points, and connections between elements
+
+        ## Part 3: Text Content (remaining space)
+        Extract ALL visible text in the image, prioritizing by importance:
+        1. Headers, titles and key labels
+        2. Table data (using proper markdown tables)
+        3. Critical UI elements and buttons
+        4. Supporting text and annotations
+
+        IMPORTANT FORMATTING INSTRUCTIONS:
+        - Use proper markdown tables for tabular data (with | and - formatting)
+        - For complex or multiple tables, include a brief label before each table
+        - If needed, abbreviate long table headers to save space
+        - For large tables, prioritize headers and most important rows
+        - Include semantic markers for non-table elements (e.g., "Button:", "Header:")
+        - For diagrams with connected elements, indicate relationships with "→" or similar notation
+        - If text is unclear or possibly inaccurate due to image quality, indicate with [?]
+        - For mathematical equations or special notation, use markdown's math formatting
+        - Be extremely concise in all sections while preserving critical information
+
+        Format output as compact markdown with minimal formatting.
+        Output must be without explanatory text, and without markdown delimiter ``` at the beginning.
+        Total output must be under 2500 characters.
+        """
+
+        return PromptTemplate.from_template(custom_prompt_template)
+
+    async def download_and_parse_images(
+        self,
+        urls: Union[str, List[str]],
+        continue_on_failure: bool = False,
+    ) -> List[Document]:
+        """
+        Download and parse images from web pages.
+
+        Args:
+            urls: Web page URLs to extract images from
+            continue_on_failure: Whether to continue if processing fails for some images
+
+        Returns:
+            List of Document objects containing image descriptions
+        """
+        # Configure the image parser with a custom prompt
+        llm = ChatOpenAI(model="gpt-4o-mini", api_key=config.OPENAI_API_KEY)
+        parser = LLMImageBlobParser(model=llm, prompt=self._custom_prompt())
+
+        # Extract image references from URLs
+        image_refs = await self._extract_image_urls_from_pages(
+            urls=urls, continue_on_failure=continue_on_failure
+        )
+
+        # If no images found, return empty list
+        if not image_refs:
+            return []
+
+        documents = []
+
+        # Process each image
+        for img_ref in image_refs:
+            try:
+                # Get image URL
+                img_url = img_ref.get("url")
+                if not img_url:
+                    continue
+
+                # Download the image
+                response = await self._http_client.client.get(img_url)
+
+                # Get image binary data
+                image_data = response.read()
+
+                # Create blob and parse with LLMImageBlobParser
+                blob = Blob(data=image_data, metadata=img_ref)
+                parsed_docs = parser.parse(blob=blob)
+
+                # Add documents to results
+                if parsed_docs:
+                    documents.extend(parsed_docs)
+
+            except Exception as e:
+                logger.error(f"Error processing image ref: {img_ref} -> {str(e)}")
+                if not continue_on_failure:
+                    raise
+
+        return documents
 
     @property
     def is_authenticated(self) -> bool:
