@@ -329,7 +329,7 @@ class WebImageProcessor:
 
         # Select the preferred version from each group
         deduplicated_images = []
-        for filename, group in filename_groups.items():
+        for _, group in filename_groups.items():
             # If only one image with this filename, use it
             if len(group) == 1:
                 deduplicated_images.append(group[0])
@@ -357,10 +357,10 @@ class WebImageProcessor:
         enhanced_images = []
         timestamp = datetime.now().isoformat()
 
-        img_id = EmbeddingToolkit.create_image_id(page_url)
+        for i, img in enumerate(deduplicated_images):
 
-        for img in deduplicated_images:
-            # Create enhanced metadata dictionary
+            img_id = EmbeddingToolkit.create_image_id(source=page_url, index=i)
+
             enhanced_img = {
                 "url": img["url"],
                 "title": img["title"],
