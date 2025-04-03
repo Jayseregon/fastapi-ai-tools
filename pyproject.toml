@@ -1,6 +1,6 @@
 [project]
 name = "fastapi-ai-tools"
-version = "0.3.5"
+version = "0.3.6"
 description = "AI & RAG backend tools"
 authors = [{ name = "jayseregon", email = "jayseregon@gmail.com" }]
 license = { text = "LGPL-3.0-or-later" }
@@ -36,6 +36,9 @@ dependencies = [
     "langchain-openai (>=0.3.8,<0.4.0)",
     "pymupdf (>=1.25.3,<2.0.0)",
     "tqdm (>=4.67.1,<5.0.0)",
+    "langchain (>=0.3.22,<0.4.0)",
+    "langchain-chroma (>=0.2.2,<0.3.0)",
+    "flashrank (>=0.2.10,<0.3.0)",
 ]
 
 [tool.poetry.group.dev.dependencies]
