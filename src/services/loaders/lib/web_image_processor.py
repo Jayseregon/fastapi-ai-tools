@@ -10,7 +10,7 @@ from langchain_openai import ChatOpenAI
 
 from src.configs.env_config import config
 from src.services.loaders.lib.http_client import HttpClient
-from src.services.utils.embedding_toolkit import EmbeddingToolkit
+from src.services.utils import create_image_id
 
 logger = logging.getLogger(__name__)
 
@@ -358,8 +358,7 @@ class WebImageProcessor:
         timestamp = datetime.now().isoformat()
 
         for i, img in enumerate(deduplicated_images):
-
-            img_id = EmbeddingToolkit.create_image_id(source=page_url, index=i)
+            img_id = create_image_id(source=page_url, index=i)
 
             enhanced_img = {
                 "url": img["url"],

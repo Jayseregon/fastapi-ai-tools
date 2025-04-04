@@ -13,7 +13,7 @@ from langchain_openai import ChatOpenAI
 
 from src.configs.env_config import config
 from src.services.loaders.files.base_document_loader import BaseDocumentLoader
-from src.services.utils import DocumentJsonToolkit
+from src.services.utils import documents_to_json, json_to_documents
 
 logger = logging.getLogger(__name__)
 
@@ -64,10 +64,10 @@ class PdfLoader(BaseDocumentLoader):
     async def documents_to_json(
         self, documents: list[Document], filename: str | Path
     ) -> None:
-        DocumentJsonToolkit.documents_to_json(documents, filename)
+        documents_to_json(documents, filename)
 
     async def json_to_documents(self, filename: str | Path) -> list[Document]:
-        return DocumentJsonToolkit.json_to_documents(filename)
+        return json_to_documents(filename)
 
     async def _is_valid_pdf(self, file_path: str | Path) -> bool:
         """
