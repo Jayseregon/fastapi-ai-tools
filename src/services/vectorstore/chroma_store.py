@@ -1,5 +1,5 @@
 import asyncio
-from typing import List, Set, Tuple
+from typing import Dict, List, Set, Tuple
 
 from chromadb.api import ClientAPI
 from chromadb.api.models.Collection import Collection
@@ -104,17 +104,37 @@ class ChromaStore:
         """
         collection = await self._get_collection(collection_name)
 
-        # Try to get all documents with source metadata
-        results = await asyncio.to_thread(
-            collection.get, where={"$exists": "source"}, include=["metadatas"]
-        )
-
-        # Extract sources from metadata
+        # Get all metadata
+        # Paginate to handle large collections
         sources = set()
-        if results and results["metadatas"]:
+        limit = 1000  # Fetch in batches
+        offset = 0
+
+        while True:
+            # Get a batch of records with their metadata
+            results = await asyncio.to_thread(
+                collection.get, include=["metadatas"], limit=limit, offset=offset
+            )
+
+            # Break if no more records
+            if (
+                not results
+                or not results["metadatas"]
+                or len(results["metadatas"]) == 0
+            ):
+                break
+
+            # Process this batch of metadatas
             for metadata in results["metadatas"]:
                 if metadata and "source" in metadata:
                     sources.add(metadata["source"])
+
+            # If we got fewer results than the limit, we're done
+            if len(results["metadatas"]) < limit:
+                break
+
+            # Otherwise continue with next batch
+            offset += limit
 
         return sources
 
@@ -124,9 +144,11 @@ class ChromaStore:
         ids: List[str],
         collection_name: str = "default_collection",
         batch_size: int = 50,
-    ) -> int:
+        skip_existing: bool = True,
+    ) -> Tuple[int, int, List[str]]:
         """
-        Store documents with their embeddings in the vector store.
+        Store documents with their embeddings in the vector store, skipping documents
+        from sources that already exist in the collection.
         Uses batching to avoid payload size limitations.
 
         Args:
@@ -134,36 +156,71 @@ class ChromaStore:
             ids: List of IDs for the documents.
             collection_name: Name of the collection to store in.
             batch_size: Number of documents per batch.
+            skip_existing: If True, skip documents from sources that already exist.
 
         Returns:
-            int: Number of documents successfully added to the store.
-
-        Raises:
-            ValueError: If no documents are provided.
-            Exception: If there's an error adding documents to ChromaDB.
+            Tuple containing:
+            - Number of documents added
+            - Number of documents skipped
+            - List of skipped sources
         """
         if not documents:
             raise ValueError("No documents provided for storage.")
 
-        vector_store: Chroma = await self._get_vector_store(collection_name)
-        added_count: int = 0
+        # First, get existing sources
+        existing_sources = await self._get_source_tracker(collection_name)
 
-        # Process documents in batches
-        total_docs: int = len(documents)
-        for i in range(0, total_docs, batch_size):
-            batch_end: int = min(i + batch_size, total_docs)
-            batch_docs: List[Document] = documents[i:batch_end]
-            batch_ids: List[str] = ids[i:batch_end]
+        # Group documents by source
+        docs_by_source: Dict[str, List[int]] = {}
+        for i, doc in enumerate(documents):
+            source = doc.metadata.get("source")
+            if source:
+                if source not in docs_by_source:
+                    docs_by_source[source] = []
+                docs_by_source[source].append(i)
 
-            try:
-                await asyncio.to_thread(
-                    vector_store.add_documents, documents=batch_docs, ids=batch_ids
-                )
-                added_count += len(batch_docs)
-            except Exception as e:
-                raise Exception(f"Error adding batch documents to ChromaDB: {e}")
+        # Determine which documents to add
+        filtered_docs = []
+        filtered_ids = []
+        skipped_sources = []
 
-        return added_count
+        for source, indices in docs_by_source.items():
+            if source in existing_sources and skip_existing:
+                # Skip this source as it already exists
+                skipped_sources.append(source)
+            else:
+                # Add all documents from this source
+                for idx in indices:
+                    filtered_docs.append(documents[idx])
+                    filtered_ids.append(ids[idx])
+
+        # Handle documents with no source
+        for i, doc in enumerate(documents):
+            if not doc.metadata.get("source"):
+                filtered_docs.append(doc)
+                filtered_ids.append(ids[i])
+
+        added_count = 0
+        if filtered_docs:
+            vector_store: Chroma = await self._get_vector_store(collection_name)
+
+            # Process documents in batches
+            total_docs = len(filtered_docs)
+            for i in range(0, total_docs, batch_size):
+                batch_end = min(i + batch_size, total_docs)
+                batch_docs = filtered_docs[i:batch_end]
+                batch_ids = filtered_ids[i:batch_end]
+
+                try:
+                    await asyncio.to_thread(
+                        vector_store.add_documents, documents=batch_docs, ids=batch_ids
+                    )
+                    added_count += len(batch_docs)
+                except Exception as e:
+                    raise Exception(f"Error adding batch documents to ChromaDB: {e}")
+
+        skipped_count = len(documents) - added_count
+        return (added_count, skipped_count, skipped_sources)
 
     async def replace_documents(
         self,
@@ -207,22 +264,23 @@ class ChromaStore:
                 collection.get, where={"source": source}, include=["metadatas"]
             )
 
-            if results and results["ids"]:  # IDs are always included in results
+            if results and results["ids"]:
                 # Count how many docs we're replacing
                 docs_replaced += len(results["ids"])
 
                 # Delete all chunks with this source
                 await asyncio.to_thread(collection.delete, ids=results["ids"])
 
-        # Add the new chunks
+        # Add the new chunks - force add because old chunks are deleted
         added_count = await self.add_documents(
             documents=documents,
             ids=ids,
             collection_name=collection_name,
             batch_size=batch_size,
+            skip_existing=False,  # Force add new chunks
         )
 
-        return (added_count, docs_replaced, sources_updated)
+        return (added_count[0], docs_replaced, sources_updated)
 
 
 # Standalone functions for external use
