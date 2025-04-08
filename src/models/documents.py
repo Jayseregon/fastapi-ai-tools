@@ -27,7 +27,7 @@ class StoreMetadata(BaseModel):
     nb_collections: int
     details: Dict[str, Dict[str, int]]
 
-    class Config:
+    class ConfigDict:
         from_attributes = True
 
 
