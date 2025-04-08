@@ -65,6 +65,11 @@ class PdfLoader(BaseDocumentLoader):
 
         logger.debug("Starting async PDF loading")
         documents = await loader.aload()
+
+        # Add document type to metadata
+        for doc in documents:
+            doc.metadata["document_type"] = "pdf"
+
         logger.debug(f"Successfully loaded PDF with {len(documents)} document chunks")
         return documents
 
