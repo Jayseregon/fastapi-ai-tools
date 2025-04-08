@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 from typing import Dict, List, Set, Tuple, Union
 
 from chromadb.api import ClientAPI
@@ -106,26 +107,6 @@ class ChromaStore:
             embedding_function=self.embedding_function,
         )
 
-    async def get_retriever(
-        self, collection_name: str = "default_collection", k: int = 10
-    ) -> BaseRetriever:
-        """
-        Get a retriever for the vector store with specified parameters.
-
-        Args:
-            collection_name: Name of the collection to use.
-            k: Number of documents to retrieve in searches.
-
-        Returns:
-            BaseRetriever: A configured retriever for the vector store.
-        """
-        vector_store: Chroma = await self._get_vector_store(collection_name)
-        retriever = await asyncio.to_thread(
-            vector_store.as_retriever, search_kwargs={"k": k}
-        )
-        logger.debug(f"Retriever created successfully for '{collection_name}'")
-        return retriever
-
     async def _get_source_tracker(self, collection_name: str) -> Set[str]:
         """
         Get set of sources already stored in a collection.
@@ -165,7 +146,10 @@ class ChromaStore:
             batch_sources = 0
             for metadata in results["metadatas"]:
                 if metadata and "source" in metadata:
-                    sources.add(metadata["source"])
+                    # Extract only the filename from the full path
+                    source_path = metadata["source"]
+                    source_filename = os.path.basename(source_path)
+                    sources.add(source_filename)
                     batch_sources += 1
 
             logger.debug(f"Processed batch with {batch_sources} sources found")
@@ -181,6 +165,26 @@ class ChromaStore:
 
         logger.debug(f"Found {len(sources)} unique document sources in collection")
         return sources
+
+    async def get_retriever(
+        self, collection_name: str = "default_collection", k: int = 10
+    ) -> BaseRetriever:
+        """
+        Get a retriever for the vector store with specified parameters.
+
+        Args:
+            collection_name: Name of the collection to use.
+            k: Number of documents to retrieve in searches.
+
+        Returns:
+            BaseRetriever: A configured retriever for the vector store.
+        """
+        vector_store: Chroma = await self._get_vector_store(collection_name)
+        retriever = await asyncio.to_thread(
+            vector_store.as_retriever, search_kwargs={"k": k}
+        )
+        logger.debug(f"Retriever created successfully for '{collection_name}'")
+        return retriever
 
     async def add_documents(
         self,
@@ -217,36 +221,43 @@ class ChromaStore:
             logger.warning("No documents provided for storage")
             raise ValueError("No documents provided for storage.")
 
-        # First, get existing sources
+        # First, get existing sources (now contains just filenames)
         existing_sources = await self._get_source_tracker(collection_name)
         logger.debug(f"Found {len(existing_sources)} existing sources in collection")
+        logger.debug(f"EXISTING SOURCES: {existing_sources}")
 
-        # Group documents by source
+        # Group documents by source filename (not full path)
         docs_by_source: Dict[str, List[int]] = {}
         for i, doc in enumerate(documents):
             source = doc.metadata.get("source")
             if source:
-                if source not in docs_by_source:
-                    docs_by_source[source] = []
-                docs_by_source[source].append(i)
+                # Extract the filename from the full path
+                source_filename = os.path.basename(source)
+                if source_filename not in docs_by_source:
+                    docs_by_source[source_filename] = []
+                docs_by_source[source_filename].append(i)
 
-        logger.debug(f"Documents grouped into {len(docs_by_source)} unique sources")
+        logger.debug(
+            f"Documents grouped into {len(docs_by_source)} unique source files"
+        )
 
         # Determine which documents to add
         filtered_docs = []
         filtered_ids = []
         skipped_sources = []
 
-        for source, indices in docs_by_source.items():
-            if source in existing_sources and skip_existing:
+        for source_filename, indices in docs_by_source.items():
+            if source_filename in existing_sources and skip_existing:
                 # Skip this source as it already exists
                 logger.debug(
-                    f"Skipping {len(indices)} documents from existing source: '{source}'"
+                    f"Skipping {len(indices)} documents from existing source: '{source_filename}'"
                 )
-                skipped_sources.append(source)
+                skipped_sources.append(source_filename)
             else:
                 # Add all documents from this source
-                logger.debug(f"Adding {len(indices)} documents from source: '{source}'")
+                logger.debug(
+                    f"Adding {len(indices)} documents from source: '{source_filename}'"
+                )
                 for idx in indices:
                     filtered_docs.append(documents[idx])
                     filtered_ids.append(ids[idx])
@@ -327,41 +338,58 @@ class ChromaStore:
 
         collection = await self._get_collection(collection_name)
 
-        # Extract unique sources from the documents
-        document_sources = set()
+        # Extract unique source filenames from the documents
+        document_source_filenames = set()
         for doc in documents:
             source = doc.metadata.get("source")
             if source:
-                document_sources.add(source)
+                source_filename = os.path.basename(source)
+                document_source_filenames.add(source_filename)
 
         logger.debug(
-            f"Found {len(document_sources)} unique sources in documents to replace"
+            f"Found {len(document_source_filenames)} unique source files in documents to replace"
         )
 
         # Count metrics
-        sources_updated = len(document_sources)
+        sources_updated = len(document_source_filenames)
         docs_replaced = 0
 
-        # For each source, remove existing chunks
-        for source in document_sources:
-            logger.debug(f"Processing replacements for source: '{source}'")
-            # Find all document IDs with this source
-            results = await asyncio.to_thread(
-                collection.get, where={"source": source}, include=["metadatas"]
+        # For each source filename, find and remove existing chunks
+        for source_filename in document_source_filenames:
+            logger.debug(
+                f"Processing replacements for source file: '{source_filename}'"
             )
 
-            if results and results["ids"]:
-                # Count how many docs we're replacing
-                docs_replaced += len(results["ids"])
-                logger.debug(
-                    f"Deleting {len(results['ids'])} existing documents for source: '{source}'"
-                )
+            # Get all documents and their metadata
+            results = await asyncio.to_thread(collection.get, include=["metadatas"])
 
-                # Delete all chunks with this source
-                await asyncio.to_thread(collection.delete, ids=results["ids"])
-                logger.debug(f"Successfully deleted documents for source: '{source}'")
+            if results and results["ids"] and results["metadatas"]:
+                # Filter documents with matching source filename
+                docs_to_delete = []
+                for i, metadata in enumerate(results["metadatas"]):
+                    if metadata and "source" in metadata:
+                        doc_source = metadata["source"]
+                        if os.path.basename(doc_source) == source_filename:
+                            docs_to_delete.append(results["ids"][i])
+
+                if docs_to_delete:
+                    # Count how many docs we're replacing
+                    docs_replaced += len(docs_to_delete)
+                    logger.debug(
+                        f"Deleting {len(docs_to_delete)} existing documents for source file: '{source_filename}'"
+                    )
+
+                    # Delete chunks with this source filename
+                    await asyncio.to_thread(collection.delete, ids=docs_to_delete)
+                    logger.debug(
+                        f"Successfully deleted documents for source file: '{source_filename}'"
+                    )
+                else:
+                    logger.debug(
+                        f"No existing documents found for source file: '{source_filename}'"
+                    )
             else:
-                logger.debug(f"No existing documents found for source: '{source}'")
+                logger.debug("No documents found in collection")
 
         # Add the new chunks - force add because old chunks are deleted
         logger.debug(f"Adding {len(documents)} new document versions")
