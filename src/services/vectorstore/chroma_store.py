@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from typing import Dict, List, Set, Tuple
 
 from chromadb.api import ClientAPI
@@ -11,6 +12,8 @@ from langchain_openai import OpenAIEmbeddings
 from src.configs.env_config import config
 from src.services.db import chroma_service
 
+logger = logging.getLogger(__name__)
+
 
 class ChromaStore:
     """Service to manage vector database operations with ChromaDB."""
@@ -19,6 +22,7 @@ class ChromaStore:
         """
         Initialize the ChromaStore service with Chroma client and embedding function.
         """
+        logger.debug("Initializing ChromaStore")
         self.client: ClientAPI = chroma_service()
         self.embedding_function: OpenAIEmbeddings = OpenAIEmbeddings(
             model="text-embedding-3-large", openai_api_key=config.OPENAI_API_KEY
@@ -33,7 +37,9 @@ class ChromaStore:
         """
         heartbeat: int = await asyncio.to_thread(self.client.heartbeat)
         if not heartbeat > 0:
+            logger.error("ChromaDB heartbeat check failed")
             raise Exception("ChromaDB is not available")
+        logger.debug(f"ChromaDB connection verified with heartbeat: {heartbeat}")
 
     async def _get_collection(
         self, collection_name: str = "default_collection"
@@ -51,9 +57,11 @@ class ChromaStore:
             Exception: If ChromaDB connection fails.
         """
         await self._check_connection()
-        return await asyncio.to_thread(
+        collection = await asyncio.to_thread(
             self.client.get_or_create_collection, collection_name
         )
+        logger.debug(f"Retrieved collection: '{collection.name}'")
+        return collection
 
     async def _get_vector_store(
         self, collection_name: str = "default_collection"
@@ -67,6 +75,7 @@ class ChromaStore:
         Returns:
             Chroma: A configured Chroma vector store instance.
         """
+        logger.debug(f"Creating vector store for collection: '{collection_name}'")
         collection: Collection = await self._get_collection(collection_name)
         return Chroma(
             client=self.client,
@@ -88,9 +97,11 @@ class ChromaStore:
             BaseRetriever: A configured retriever for the vector store.
         """
         vector_store: Chroma = await self._get_vector_store(collection_name)
-        return await asyncio.to_thread(
+        retriever = await asyncio.to_thread(
             vector_store.as_retriever, search_kwargs={"k": k}
         )
+        logger.debug(f"Retriever created successfully for '{collection_name}'")
+        return retriever
 
     async def _get_source_tracker(self, collection_name: str) -> Set[str]:
         """
@@ -102,6 +113,7 @@ class ChromaStore:
         Returns:
             Set of document sources already stored in the collection
         """
+        logger.debug(f"Getting source tracker for collection: '{collection_name}'")
         collection = await self._get_collection(collection_name)
 
         # Get all metadata
@@ -111,6 +123,7 @@ class ChromaStore:
         offset = 0
 
         while True:
+            logger.debug(f"Fetching metadata batch: limit={limit}, offset={offset}")
             # Get a batch of records with their metadata
             results = await asyncio.to_thread(
                 collection.get, include=["metadatas"], limit=limit, offset=offset
@@ -122,20 +135,28 @@ class ChromaStore:
                 or not results["metadatas"]
                 or len(results["metadatas"]) == 0
             ):
+                logger.debug("No more metadata records found")
                 break
 
             # Process this batch of metadatas
+            batch_sources = 0
             for metadata in results["metadatas"]:
                 if metadata and "source" in metadata:
                     sources.add(metadata["source"])
+                    batch_sources += 1
+
+            logger.debug(f"Processed batch with {batch_sources} sources found")
 
             # If we got fewer results than the limit, we're done
             if len(results["metadatas"]) < limit:
+                logger.debug("Reached end of collection metadata")
                 break
 
             # Otherwise continue with next batch
             offset += limit
+            logger.debug(f"Moving to next batch, offset={offset}")
 
+        logger.debug(f"Found {len(sources)} unique document sources in collection")
         return sources
 
     async def add_documents(
@@ -164,11 +185,18 @@ class ChromaStore:
             - Number of documents skipped
             - List of skipped sources
         """
+        logger.debug(
+            f"Adding {len(documents)} documents to collection '{collection_name}' "
+            f"(batch_size={batch_size}, skip_existing={skip_existing})"
+        )
+
         if not documents:
+            logger.warning("No documents provided for storage")
             raise ValueError("No documents provided for storage.")
 
         # First, get existing sources
         existing_sources = await self._get_source_tracker(collection_name)
+        logger.debug(f"Found {len(existing_sources)} existing sources in collection")
 
         # Group documents by source
         docs_by_source: Dict[str, List[int]] = {}
@@ -179,6 +207,8 @@ class ChromaStore:
                     docs_by_source[source] = []
                 docs_by_source[source].append(i)
 
+        logger.debug(f"Documents grouped into {len(docs_by_source)} unique sources")
+
         # Determine which documents to add
         filtered_docs = []
         filtered_ids = []
@@ -187,21 +217,33 @@ class ChromaStore:
         for source, indices in docs_by_source.items():
             if source in existing_sources and skip_existing:
                 # Skip this source as it already exists
+                logger.debug(
+                    f"Skipping {len(indices)} documents from existing source: '{source}'"
+                )
                 skipped_sources.append(source)
             else:
                 # Add all documents from this source
+                logger.debug(f"Adding {len(indices)} documents from source: '{source}'")
                 for idx in indices:
                     filtered_docs.append(documents[idx])
                     filtered_ids.append(ids[idx])
 
         # Handle documents with no source
+        no_source_count = 0
         for i, doc in enumerate(documents):
             if not doc.metadata.get("source"):
                 filtered_docs.append(doc)
                 filtered_ids.append(ids[i])
+                no_source_count += 1
+
+        if no_source_count > 0:
+            logger.debug(f"Found {no_source_count} documents with no source")
 
         added_count = 0
         if filtered_docs:
+            logger.debug(
+                f"Adding {len(filtered_docs)} filtered documents to vector store"
+            )
             vector_store: Chroma = await self._get_vector_store(collection_name)
 
             # Process documents in batches
@@ -211,15 +253,26 @@ class ChromaStore:
                 batch_docs = filtered_docs[i:batch_end]
                 batch_ids = filtered_ids[i:batch_end]
 
+                logger.debug(
+                    f"Processing batch {i//batch_size + 1}: documents {i+1}-{batch_end} of {total_docs}"
+                )
+
                 try:
                     await asyncio.to_thread(
                         vector_store.add_documents, documents=batch_docs, ids=batch_ids
                     )
                     added_count += len(batch_docs)
+                    logger.debug(
+                        f"Successfully added batch of {len(batch_docs)} documents"
+                    )
                 except Exception as e:
+                    logger.error(f"Error adding documents batch: {str(e)}")
                     raise Exception(f"Error adding batch documents to ChromaDB: {e}")
 
         skipped_count = len(documents) - added_count
+        logger.debug(
+            f"Documents added: {added_count}, skipped: {skipped_count}, skipped sources: {len(skipped_sources)}"
+        )
         return (added_count, skipped_count, skipped_sources)
 
     async def replace_documents(
@@ -241,8 +294,13 @@ class ChromaStore:
         Returns:
             Tuple containing (docs_added, docs_replaced, sources_updated)
         """
+        logger.debug(
+            f"Replacing documents in collection '{collection_name}': {len(documents)} documents provided"
+        )
+
         if not documents:
-            raise ValueError("No documents provided for storage.")
+            logger.warning("No documents provided for replacement")
+            raise ValueError("No documents provided for replacement.")
 
         collection = await self._get_collection(collection_name)
 
@@ -253,12 +311,17 @@ class ChromaStore:
             if source:
                 document_sources.add(source)
 
+        logger.debug(
+            f"Found {len(document_sources)} unique sources in documents to replace"
+        )
+
         # Count metrics
         sources_updated = len(document_sources)
         docs_replaced = 0
 
         # For each source, remove existing chunks
         for source in document_sources:
+            logger.debug(f"Processing replacements for source: '{source}'")
             # Find all document IDs with this source
             results = await asyncio.to_thread(
                 collection.get, where={"source": source}, include=["metadatas"]
@@ -267,11 +330,18 @@ class ChromaStore:
             if results and results["ids"]:
                 # Count how many docs we're replacing
                 docs_replaced += len(results["ids"])
+                logger.debug(
+                    f"Deleting {len(results['ids'])} existing documents for source: '{source}'"
+                )
 
                 # Delete all chunks with this source
                 await asyncio.to_thread(collection.delete, ids=results["ids"])
+                logger.debug(f"Successfully deleted documents for source: '{source}'")
+            else:
+                logger.debug(f"No existing documents found for source: '{source}'")
 
         # Add the new chunks - force add because old chunks are deleted
+        logger.debug(f"Adding {len(documents)} new document versions")
         added_count = await self.add_documents(
             documents=documents,
             ids=ids,
@@ -280,6 +350,9 @@ class ChromaStore:
             skip_existing=False,  # Force add new chunks
         )
 
+        logger.debug(
+            f"Document replacement complete: {added_count[0]} added, {docs_replaced} replaced, {sources_updated} sources updated"
+        )
         return (added_count[0], docs_replaced, sources_updated)
 
 
@@ -298,4 +371,6 @@ async def chroma_retriever(
         BaseRetriever: A configured retriever for the specified collection.
     """
     store: ChromaStore = ChromaStore()
-    return await store.get_retriever(collection_name, k)
+    retriever = await store.get_retriever(collection_name, k)
+    logger.debug("Chroma retriever created successfully")
+    return retriever

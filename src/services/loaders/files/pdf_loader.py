@@ -42,14 +42,19 @@ class PdfLoader(BaseDocumentLoader):
         file_path: str | Path,
     ) -> list[Document]:
         if not self._initialized:
+            logger.debug("PDF loader not initialized, initializing now")
             await self.initialize()
 
         if isinstance(file_path, str):
             file_path = Path(file_path)
 
+        logger.debug("Attempting to load PDF document")
+
         if not await self._is_valid_pdf(file_path):
+            logger.debug(f"PDF validation failed for: {file_path}")
             raise ValueError(f"Invalid or inaccessible PDF file: {file_path}")
 
+        logger.debug("Creating PyMuPDFLoader instance")
         loader = PyMuPDFLoader(
             file_path=file_path.as_posix(),
             images_inner_format="markdown-img",
@@ -58,16 +63,25 @@ class PdfLoader(BaseDocumentLoader):
             images_parser=LLMImageBlobParser(model=self._llm_model),
         )
 
+        logger.debug("Starting async PDF loading")
         documents = await loader.aload()
+        logger.debug(f"Successfully loaded PDF with {len(documents)} document chunks")
         return documents
 
     async def documents_to_json(
         self, documents: list[Document], filename: str | Path
     ) -> None:
+        logger.debug(f"Serializing {len(documents)} documents to JSON file: {filename}")
         documents_to_json(documents, filename)
+        logger.debug(f"Successfully saved documents to JSON: {filename}")
 
     async def json_to_documents(self, filename: str | Path) -> list[Document]:
-        return json_to_documents(filename)
+        logger.debug(f"Loading documents from JSON file: {filename}")
+        documents = json_to_documents(filename)
+        logger.debug(
+            f"Successfully loaded {len(documents)} documents from JSON: {filename}"
+        )
+        return documents
 
     async def _is_valid_pdf(self, file_path: str | Path) -> bool:
         """
@@ -82,6 +96,8 @@ class PdfLoader(BaseDocumentLoader):
         if isinstance(file_path, str):
             file_path = Path(file_path)
 
+        logger.debug("Validating PDF file")
+
         # Check if file exists
         if not file_path.exists():
             logger.error(f"File not found: {file_path}")
@@ -89,20 +105,26 @@ class PdfLoader(BaseDocumentLoader):
 
         # Check file extension (basic check)
         if file_path.suffix.lower() != ".pdf":
-            logger.warning(f"File does not have PDF extension: {file_path}")
+            logger.warning("File does not have PDF extension")
+            logger.debug("Continuing validation despite incorrect extension")
             # Continue checking - some PDFs might have wrong extension
 
         try:
             # Check PDF signature (faster check)
+            logger.debug("Checking PDF signature")
             with open(file_path, "rb") as f:
                 header = f.read(1024)
                 if not header.startswith(b"%PDF-"):
                     logger.error(f"File does not have PDF signature: {file_path}")
                     return False
 
+            logger.debug(
+                "PDF signature valid, performing deeper validation with PyMuPDF"
+            )
             # Deeper validation using PyMuPDF
             doc = fitz.open(file_path)
             # Basic structure validation
+            logger.debug(f"PDF opened, page count: {doc.page_count}")
             if doc.page_count == 0:
                 logger.error(f"PDF has no pages: {file_path}")
                 doc.close()
@@ -117,10 +139,13 @@ class PdfLoader(BaseDocumentLoader):
             # Validate document structure
             try:
                 # Try accessing metadata to verify structure
+                logger.debug("Checking PDF metadata")
                 _ = doc.metadata
                 # Try accessing first page to verify readability
+                logger.debug("Checking first page accessibility")
                 _ = doc[0]
                 doc.close()
+                logger.debug("PDF validation successful")
                 return True
             except Exception as e:
                 logger.error(f"PDF structure validation failed: {str(e)}")
