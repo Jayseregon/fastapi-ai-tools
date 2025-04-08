@@ -108,6 +108,7 @@ class WebDocumentLoader:
 
         documents = []
         async for doc in loader.alazy_load():
+            doc.metadata["document_type"] = "web"
             documents.append(doc)
 
         return documents
@@ -134,4 +135,5 @@ class WebDocumentLoader:
         )
 
         async for doc in loader.alazy_load():
+            doc.metadata["document_type"] = "pdf"
             yield doc
