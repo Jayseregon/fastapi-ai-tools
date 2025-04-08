@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List, Set, Tuple, Union
 
 from chromadb.api import ClientAPI
 from chromadb.api.models.Collection import Collection
@@ -27,6 +27,29 @@ class ChromaStore:
         self.embedding_function: OpenAIEmbeddings = OpenAIEmbeddings(
             model="text-embedding-3-large", openai_api_key=config.OPENAI_API_KEY
         )
+
+    @property
+    def store_metadata(self) -> Dict[str, Union[int, Dict[str, Dict[str, int]]]]:
+        """
+        Get metadata about the vector store.
+
+        Retrieves information about all collections in the Chroma store,
+        including the total number of collections and details about each
+        individual collection.
+
+        Returns:
+            Dict[str, Union[int, Dict[str, Dict[str, int]]]]: A dictionary containing:
+                - "nb_collections": The total number of collections in the store
+                - "details": A dictionary mapping collection names to their details,
+                            where each detail contains the count of items in that collection
+        """
+        nb_collection: int = self.client.count_collections()
+        collections: List[str] = self.client.list_collections()
+        collections_details: Dict[str, Dict[str, int]] = {
+            coll: {"count": self.client.get_collection(coll).count()}
+            for coll in collections
+        }
+        return {"nb_collections": nb_collection, "details": collections_details}
 
     async def _check_connection(self) -> None:
         """
@@ -254,7 +277,7 @@ class ChromaStore:
                 batch_ids = filtered_ids[i:batch_end]
 
                 logger.debug(
-                    f"Processing batch {i//batch_size + 1}: documents {i+1}-{batch_end} of {total_docs}"
+                    f"Processing batch {i // batch_size + 1}: documents {i + 1}-{batch_end} of {total_docs}"
                 )
 
                 try:

@@ -13,6 +13,7 @@ from fastapi.security import OAuth2PasswordBearer
 from src.configs.env_config import config
 from src.configs.log_config import configure_logging
 from src.models.user import User
+from src.routes.documents import router as documents_router
 from src.routes.embedding import router as embedding_router
 from src.security.jwt_auth import validate_token
 from src.security.rateLimiter import FastAPILimiter
@@ -102,6 +103,7 @@ async def read_users_me(
 
 
 app.include_router(embedding_router)
+app.include_router(documents_router)
 app.include_router(graph_router)
 app.include_router(chroma_router)
 
