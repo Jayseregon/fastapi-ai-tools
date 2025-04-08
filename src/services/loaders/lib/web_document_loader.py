@@ -11,7 +11,7 @@ from src.services.loaders.lib.session_adapter import SessionAdapter
 logger = logging.getLogger(__name__)
 
 
-class DocumentLoader:
+class WebDocumentLoader:
     """Handles document loading from HTML content and conversion to LangChain documents."""
 
     def __init__(self, default_parser: str = "html.parser"):

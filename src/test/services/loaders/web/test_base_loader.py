@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.services.loaders.lib import DocumentLoader, HttpClient
+from src.services.loaders.lib import HttpClient, WebDocumentLoader
 from src.services.loaders.web.base_web_loader import BaseWebLoader
 
 
@@ -32,7 +32,7 @@ class TestBaseWebLoader:
 
     @pytest.fixture
     def mock_document_loader(self):
-        return MagicMock(spec=DocumentLoader)
+        return MagicMock(spec=WebDocumentLoader)
 
     @pytest.fixture
     def base_loader(self, mock_http_client, mock_document_loader):
@@ -51,7 +51,7 @@ class TestBaseWebLoader:
         """Test initialization with default parameters"""
         loader = _TestableLoader()
         assert isinstance(loader._http_client, HttpClient)
-        assert isinstance(loader._document_loader, DocumentLoader)
+        assert isinstance(loader._document_loader, WebDocumentLoader)
         assert loader._initialized is False
 
     @pytest.mark.asyncio

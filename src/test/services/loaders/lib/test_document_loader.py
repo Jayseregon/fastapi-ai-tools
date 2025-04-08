@@ -4,19 +4,19 @@ import pytest
 from langchain_community.document_loaders import WebBaseLoader
 from langchain_core.documents import Document
 
-from src.services.loaders.lib.document_loader import DocumentLoader
 from src.services.loaders.lib.http_client import HttpClient
 from src.services.loaders.lib.session_adapter import SessionAdapter
+from src.services.loaders.lib.web_document_loader import WebDocumentLoader
 
 
 class TestDocumentLoader:
     @pytest.fixture
     def document_loader(self):
-        return DocumentLoader()
+        return WebDocumentLoader()
 
     @pytest.fixture
     def custom_parser_loader(self):
-        return DocumentLoader(default_parser="lxml")
+        return WebDocumentLoader(default_parser="lxml")
 
     @pytest.fixture
     def mock_http_client(self):
@@ -31,12 +31,12 @@ class TestDocumentLoader:
         return {"session": "abc123", "user_id": "user1"}
 
     def test_initialization_default(self, document_loader):
-        """Test DocumentLoader initializes with default parser"""
+        """Test WebDocumentLoader initializes with default parser"""
         assert document_loader.default_parser == "html.parser"
         assert document_loader.cookieManager is not None
 
     def test_initialization_custom_parser(self, custom_parser_loader):
-        """Test DocumentLoader initializes with custom parser"""
+        """Test WebDocumentLoader initializes with custom parser"""
         assert custom_parser_loader.default_parser == "lxml"
 
     def test_create_session_adapter(
@@ -260,7 +260,7 @@ class TestDocumentLoader:
     async def test_webbaseloader_alazy_load_interaction(
         self, document_loader, mock_http_client
     ):
-        """Test the interaction between DocumentLoader and WebBaseLoader's alazy_load method"""
+        """Test the interaction between WebDocumentLoader and WebBaseLoader's alazy_load method"""
         urls = ["https://example.com"]
 
         # Create mock documents to return
@@ -291,7 +291,7 @@ class TestDocumentLoader:
     # Add a separate test for alazy_load method that requires less complex mocking
     @pytest.mark.asyncio
     async def test_document_loader_handles_alazy_load_correctly(self, document_loader):
-        """Test that DocumentLoader correctly handles the output of alazy_load"""
+        """Test that WebDocumentLoader correctly handles the output of alazy_load"""
 
         # Create a simple class that mimics the behavior of WebBaseLoader.alazy_load
         class MockWebLoader:
@@ -340,7 +340,8 @@ class TestDocumentLoader:
                 AsyncMock(return_value=mock_cookies),
             ),
             patch(
-                "src.services.loaders.lib.document_loader.SessionAdapter", autospec=True
+                "src.services.loaders.lib.web_document_loader.SessionAdapter",
+                autospec=True,
             ) as MockSessionAdapter,
         ):
             await document_loader.create_langchain_loader(mock_http_client, url)
@@ -366,7 +367,8 @@ class TestDocumentLoader:
                 AsyncMock(return_value={}),
             ),
             patch(
-                "src.services.loaders.lib.document_loader.WebBaseLoader", autospec=True
+                "src.services.loaders.lib.web_document_loader.WebBaseLoader",
+                autospec=True,
             ) as MockWebBaseLoader,
         ):
             await document_loader.create_langchain_loader(mock_http_client, url)

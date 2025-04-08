@@ -2,7 +2,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Dict, Optional
 
-from src.services.loaders.lib import DocumentLoader, HttpClient
+from src.services.loaders.lib import HttpClient, WebDocumentLoader
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +13,7 @@ class BaseWebLoader(ABC):
     def __init__(self, http_client=None, document_loader=None):
         """Initialize the web loader service."""
         self._http_client = http_client or HttpClient()
-        self._document_loader = document_loader or DocumentLoader()
+        self._document_loader = document_loader or WebDocumentLoader()
         self._initialized = False
 
     async def __aenter__(self):
