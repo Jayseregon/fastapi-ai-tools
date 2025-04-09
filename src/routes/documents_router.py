@@ -6,7 +6,7 @@ from typing import List, Optional, Tuple, cast
 from fastapi import APIRouter, Depends, UploadFile
 from langchain.schema import Document
 
-from src.models.documents import (
+from src.models.documents_models import (
     AddPDFResponse,
     DocumentMetadata,
     StoreMetadata,
