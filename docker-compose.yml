@@ -13,7 +13,7 @@ services:
     image: neo4j:latest
     container_name: fastapi-neo4j
     environment:
-      - NEO4J_AUTH=neo4j/neo4j
+      - NEO4J_AUTH=neo4j/fakepwd007
     ports:
       - 7474:7474
       - 7687:7687
