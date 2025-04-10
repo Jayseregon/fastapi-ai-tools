@@ -4,6 +4,7 @@ from typing import AsyncIterator, Dict, List, Optional
 from langchain_core.documents import Document
 
 from src.services.loaders.web.base_web_loader import BaseWebLoader
+from src.services.loaders.web.web_image_loader import create_web_image_loader
 
 logger = logging.getLogger(__name__)
 
@@ -41,14 +42,14 @@ class PublicLoader(BaseWebLoader):
         self._initialized = True
         logger.debug(f"Initialized public web loader service with {timeout}s timeout")
 
-    async def load_documents(
-        self, urls: str | List[str], continue_on_failure: bool = True
+    async def load_multi_documents(
+        self, urls: List[str], continue_on_failure: bool = True
     ) -> List[Document]:
         """
         Load documents from public URLs using LangChain's WebBaseLoader.
 
         Args:
-            urls: Single URL or list of URLs to load
+            urls: a list of URLs to load
             continue_on_failure: Whether to continue if loading fails for some URLs
 
         Returns:
@@ -70,7 +71,59 @@ class PublicLoader(BaseWebLoader):
                 raise
             return []
 
-    async def lazy_load_documents(
+    async def load_single_document(self, url: str) -> Document:
+        """
+        Load a single document from a public URL.
+
+        Args:
+            url: URL string to load content from
+
+        Returns:
+            A Document object containing the webpage content or None on error
+        """
+        if not self._initialized:
+            await self.initialize()
+
+        try:
+            documents = await self._document_loader.load_documents_with_langchain(
+                http_client=self._http_client,
+                urls=url,
+                continue_on_failure=False,
+            )
+            return documents[0] if documents else Document(page_content="", metadata={})
+        except Exception as e:
+            logger.error(f"Error loading document: {str(e)}")
+            return Document(page_content="", metadata={})
+
+    async def load_single_document_with_images(self, url: str) -> List[Document]:
+        """
+        Load a webpage document along with any images found at the URL.
+
+        Args:
+            url: URL string to load content and images from
+
+        Returns:
+            A list of Document objects containing the webpage content and image content,
+            or None on error
+        """
+        if not self._initialized:
+            await self.initialize()
+
+        documents = []
+        try:
+            single_doc = await self.load_single_document(url=url)
+            documents.append(single_doc)
+
+            img_loader = await create_web_image_loader()
+            img_docs = await img_loader.download_and_parse_images(urls=url)
+            documents.extend(img_docs)
+
+            return documents
+        except Exception as e:
+            logger.error(f"Error loading document: {str(e)}")
+            return []
+
+    async def lazy_load_multi_documents(
         self, urls: str | List[str], continue_on_failure: bool = True
     ) -> AsyncIterator[Document]:
         """

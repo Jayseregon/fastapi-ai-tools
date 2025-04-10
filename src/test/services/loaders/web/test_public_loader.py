@@ -102,7 +102,7 @@ class TestPublicLoader:
         )
 
         # Load documents
-        result = await public_loader.load_documents(test_url)
+        result = await public_loader.load_multi_documents(test_url)
 
         # Verify document loader was called correctly
         public_loader._document_loader.load_documents_with_langchain.assert_called_once_with(
@@ -132,7 +132,7 @@ class TestPublicLoader:
         )
 
         # Load documents
-        result = await public_loader.load_documents(test_urls)
+        result = await public_loader.load_multi_documents(test_urls)
 
         # Verify document loader was called with multiple URLs
         public_loader._document_loader.load_documents_with_langchain.assert_called_once_with(
@@ -145,7 +145,7 @@ class TestPublicLoader:
 
     @pytest.mark.asyncio
     async def test_load_documents_auto_initialize(self, public_loader):
-        """Test that load_documents initializes if not already initialized"""
+        """Test that load_multi_documents initializes if not already initialized"""
         # Mock dependencies
         public_loader._http_client = AsyncMock()
         public_loader._document_loader = AsyncMock()
@@ -156,14 +156,14 @@ class TestPublicLoader:
         public_loader.initialize = AsyncMock(wraps=original_initialize)
 
         # Load documents
-        await public_loader.load_documents("https://example.com")
+        await public_loader.load_multi_documents("https://example.com")
 
         # Verify initialize was called
         public_loader.initialize.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_load_documents_with_error(self, public_loader):
-        """Test load_documents with an error and continue_on_failure=True"""
+        """Test load_multi_documents with an error and continue_on_failure=True"""
         # Mock dependencies with error
         public_loader._http_client = AsyncMock()
         public_loader._document_loader = AsyncMock()
@@ -173,14 +173,14 @@ class TestPublicLoader:
         )
 
         # Should return empty list when continuing on failure
-        result = await public_loader.load_documents(
+        result = await public_loader.load_multi_documents(
             "https://example.com", continue_on_failure=True
         )
         assert result == []
 
     @pytest.mark.asyncio
     async def test_load_documents_with_error_no_continue(self, public_loader):
-        """Test load_documents with an error and continue_on_failure=False"""
+        """Test load_multi_documents with an error and continue_on_failure=False"""
         # Mock dependencies with error
         public_loader._http_client = AsyncMock()
         public_loader._document_loader = AsyncMock()
@@ -191,7 +191,7 @@ class TestPublicLoader:
 
         # Should propagate exception when not continuing on failure
         with pytest.raises(Exception, match="Loading error"):
-            await public_loader.load_documents(
+            await public_loader.load_multi_documents(
                 "https://example.com", continue_on_failure=False
             )
 
@@ -199,18 +199,20 @@ class TestPublicLoader:
     async def test_lazy_load_documents(self, public_loader, sample_documents):
         """Test lazy loading of documents"""
 
-        # Fix: Correct the function signature to match PublicLoader.lazy_load_documents
+        # Fix: Correct the function signature to match PublicLoader.lazy_load_multi_documents
         async def mock_lazy_load(self, urls, continue_on_failure=True):
             for doc in sample_documents:
                 yield doc
 
         # Directly patch the method
         with patch.object(
-            public_loader.__class__, "lazy_load_documents", mock_lazy_load
+            public_loader.__class__, "lazy_load_multi_documents", mock_lazy_load
         ):
             # Collect lazy-loaded documents
             result = []
-            async for doc in public_loader.lazy_load_documents("https://example.com"):
+            async for doc in public_loader.lazy_load_multi_documents(
+                "https://example.com"
+            ):
                 result.append(doc)
 
             # Verify all documents were yielded
@@ -221,14 +223,14 @@ class TestPublicLoader:
 
     @pytest.mark.asyncio
     async def test_lazy_load_documents_auto_initialize(self, public_loader):
-        """Test that lazy_load_documents initializes if not already initialized"""
+        """Test that lazy_load_multi_documents initializes if not already initialized"""
         # Set up not initialized state
         public_loader._initialized = False
 
         # Mock initialize method to verify it's called
         public_loader.initialize = AsyncMock()
 
-        # Create a simple implementation of lazy_load_documents that just checks initialization
+        # Create a simple implementation of lazy_load_multi_documents that just checks initialization
         # This avoids async iteration issues by focusing only on the initialization behavior
         async def simplified_lazy_load():
             # Just check if initialization happens and return
@@ -239,11 +241,15 @@ class TestPublicLoader:
 
         # Patch the document loader's method to return our simple implementation
         with patch.object(
-            public_loader, "lazy_load_documents", return_value=simplified_lazy_load()
+            public_loader,
+            "lazy_load_multi_documents",
+            return_value=simplified_lazy_load(),
         ):
             # Just trigger the generator
             try:
-                async for _ in public_loader.lazy_load_documents("https://example.com"):
+                async for _ in public_loader.lazy_load_multi_documents(
+                    "https://example.com"
+                ):
                     break
             except StopAsyncIteration:
                 pass  # Expected to stop immediately
@@ -300,3 +306,194 @@ class TestPublicLoader:
             MockLoader.assert_called_once()
             loader_instance.initialize.assert_called_once()
             assert service == loader_instance
+
+    @pytest.mark.asyncio
+    async def test_load_single_document(self, public_loader):
+        """Test loading a single document from a URL"""
+        # Mock dependencies
+        public_loader._http_client = AsyncMock()
+        public_loader._document_loader = AsyncMock()
+        public_loader._initialized = True
+
+        test_url = "https://example.com"
+        sample_doc = Document(
+            page_content="Test content", metadata={"source": test_url}
+        )
+        public_loader._document_loader.load_documents_with_langchain.return_value = [
+            sample_doc
+        ]
+
+        # Load document
+        result = await public_loader.load_single_document(test_url)
+
+        # Verify document loader was called correctly
+        public_loader._document_loader.load_documents_with_langchain.assert_called_once_with(
+            http_client=public_loader._http_client,
+            urls=test_url,
+            continue_on_failure=False,
+        )
+
+        # Verify correct document was returned
+        assert result == sample_doc
+
+    @pytest.mark.asyncio
+    async def test_load_single_document_empty_result(self, public_loader):
+        """Test loading a single document with empty result"""
+        # Mock dependencies
+        public_loader._http_client = AsyncMock()
+        public_loader._document_loader = AsyncMock()
+        public_loader._initialized = True
+
+        # Return empty list from document loader
+        public_loader._document_loader.load_documents_with_langchain.return_value = []
+
+        # Load document
+        result = await public_loader.load_single_document("https://example.com")
+
+        # Verify an empty document was returned
+        assert isinstance(result, Document)
+        assert result.page_content == ""
+        assert result.metadata == {}
+
+    @pytest.mark.asyncio
+    async def test_load_single_document_error(self, public_loader):
+        """Test loading a single document with error"""
+        # Mock dependencies
+        public_loader._http_client = AsyncMock()
+        public_loader._document_loader = AsyncMock()
+        public_loader._initialized = True
+        public_loader._document_loader.load_documents_with_langchain.side_effect = (
+            Exception("Loading error")
+        )
+
+        # Load document with error
+        result = await public_loader.load_single_document("https://example.com")
+
+        # Verify None was returned on error
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_load_single_document_auto_initialize(self, public_loader):
+        """Test that load_single_document initializes if not already initialized"""
+        # Mock dependencies
+        public_loader._http_client = AsyncMock()
+        public_loader._document_loader = AsyncMock()
+        public_loader._initialized = False
+
+        # Create a version of initialize we can track
+        original_initialize = public_loader.initialize
+        public_loader.initialize = AsyncMock(wraps=original_initialize)
+
+        sample_doc = Document(
+            page_content="Test content", metadata={"source": "https://example.com"}
+        )
+        public_loader._document_loader.load_documents_with_langchain.return_value = [
+            sample_doc
+        ]
+
+        # Load document
+        await public_loader.load_single_document("https://example.com")
+
+        # Verify initialize was called
+        public_loader.initialize.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_load_single_document_with_images(self, public_loader):
+        """Test loading a document with images"""
+        # Mock dependencies
+        public_loader._http_client = AsyncMock()
+        public_loader._initialized = True
+
+        # Mock the load_single_document method
+        text_doc = Document(
+            page_content="Page content", metadata={"source": "https://example.com"}
+        )
+        public_loader.load_single_document = AsyncMock(return_value=text_doc)
+
+        # Mock image loader
+        image_docs = [
+            Document(
+                page_content="Image 1 content",
+                metadata={"source": "https://example.com/img1.jpg", "type": "image"},
+            ),
+            Document(
+                page_content="Image 2 content",
+                metadata={"source": "https://example.com/img2.jpg", "type": "image"},
+            ),
+        ]
+        mock_img_loader = AsyncMock()
+        mock_img_loader.download_and_parse_images = AsyncMock(return_value=image_docs)
+
+        with patch(
+            "src.services.loaders.web.public_loader.create_web_image_loader",
+            AsyncMock(return_value=mock_img_loader),
+        ):
+            # Load document with images
+            result = await public_loader.load_single_document_with_images(
+                "https://example.com"
+            )
+
+            # Verify document loader and image loader were called
+            public_loader.load_single_document.assert_called_once_with(
+                url="https://example.com"
+            )
+            mock_img_loader.download_and_parse_images.assert_called_once_with(
+                urls="https://example.com"
+            )
+
+            # Verify all documents were returned (1 text + 2 images)
+            assert len(result) == 3
+            assert result[0] == text_doc
+            assert result[1:] == image_docs
+
+    @pytest.mark.asyncio
+    async def test_load_single_document_with_images_error(self, public_loader):
+        """Test loading a document with images when an error occurs"""
+        # Mock dependencies
+        public_loader._http_client = AsyncMock()
+        public_loader._initialized = True
+
+        # Mock the load_single_document method to raise an exception
+        public_loader.load_single_document = AsyncMock(
+            side_effect=Exception("Loading error")
+        )
+
+        # Load document with images with error
+        result = await public_loader.load_single_document_with_images(
+            "https://example.com"
+        )
+
+        # Verify None was returned on error
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_load_single_document_with_images_auto_initialize(
+        self, public_loader
+    ):
+        """Test that load_single_document_with_images initializes if not already initialized"""
+        # Mock dependencies
+        public_loader._http_client = AsyncMock()
+        public_loader._initialized = False
+
+        # Create a version of initialize we can track
+        original_initialize = public_loader.initialize
+        public_loader.initialize = AsyncMock(wraps=original_initialize)
+
+        # Mock the load_single_document and image loader to return simple values
+        public_loader.load_single_document = AsyncMock(
+            return_value=Document(page_content="Content")
+        )
+
+        with patch(
+            "src.services.loaders.web.public_loader.create_web_image_loader",
+            AsyncMock(
+                return_value=AsyncMock(
+                    download_and_parse_images=AsyncMock(return_value=[])
+                )
+            ),
+        ):
+            # Load document with images
+            await public_loader.load_single_document_with_images("https://example.com")
+
+            # Verify initialize was called
+            public_loader.initialize.assert_called_once()
