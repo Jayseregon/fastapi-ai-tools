@@ -17,6 +17,7 @@ from src.models.user import User
 from src.routes.chroma_infos_router import router as chroma_router
 from src.routes.documents_router import router as documents_router
 from src.routes.neo4j_infos_router import router as neo4j_router
+from src.routes.retriever_router import router as retriever_router
 from src.security.jwt_auth import validate_token
 from src.security.rateLimiter import FastAPILimiter
 from src.security.rateLimiter.depends import RateLimiter
@@ -103,8 +104,9 @@ async def read_users_me(
 
 
 app.include_router(documents_router)
-app.include_router(neo4j_router)
+app.include_router(retriever_router)
 app.include_router(chroma_router)
+app.include_router(neo4j_router)
 
 
 @app.exception_handler(HTTPException)

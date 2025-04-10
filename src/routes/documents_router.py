@@ -19,7 +19,7 @@ from src.services.loaders.files import PdfLoader
 from src.services.processors import DocumentsPreprocessing
 from src.services.vectorstore import ChromaStore
 
-router = APIRouter(prefix="/v1/documents", tags=["documents"])
+router = APIRouter(prefix="/v1/documents", tags=["Documents Pipeline"])
 
 
 async def _process_pdf_file(
