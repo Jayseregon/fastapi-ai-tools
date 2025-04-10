@@ -1,5 +1,6 @@
 import logging
 from contextlib import asynccontextmanager
+from typing import Optional
 
 import redis.asyncio as redis
 from asgi_correlation_id import CorrelationIdMiddleware
@@ -59,7 +60,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
 @app.get("/", response_class=HTMLResponse)
-async def read_root(rate: None = Depends(RateLimiter(times=3, seconds=10))):
+async def read_root(rate: Optional[None] = Depends(RateLimiter(times=3, seconds=10))):
     return """
     <!DOCTYPE html>
     <html>
@@ -96,7 +97,7 @@ async def read_root(rate: None = Depends(RateLimiter(times=3, seconds=10))):
 @app.get("/users/me")
 async def read_users_me(
     current_user: User = Depends(validate_token),
-    rate: None = Depends(RateLimiter(times=3, seconds=10)),
+    rate: Optional[None] = Depends(RateLimiter(times=3, seconds=10)),
 ):
     return current_user
 
