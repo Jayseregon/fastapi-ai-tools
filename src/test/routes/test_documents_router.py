@@ -5,7 +5,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from langchain.schema import Document
 
-from src.routes.documents_router import COLLECTION_NAME, _process_pdf_file, router
+from src.configs.env_config import config
+from src.routes.documents_router import _process_pdf_file, router
 
 
 @pytest.fixture
@@ -205,7 +206,7 @@ class TestDocumentsRouter:
         mock_store.add_documents.assert_called_once_with(
             documents=sample_chunks,
             ids=sample_chunk_ids,
-            collection_name=COLLECTION_NAME,
+            collection_name=config.COLLECTION_NAME,
         )
 
         # Verify cleanup
@@ -275,7 +276,7 @@ class TestDocumentsRouter:
         mock_store.replace_documents.assert_called_once_with(
             documents=sample_chunks,
             ids=sample_chunk_ids,
-            collection_name=COLLECTION_NAME,
+            collection_name=config.COLLECTION_NAME,
         )
 
         # Verify cleanup

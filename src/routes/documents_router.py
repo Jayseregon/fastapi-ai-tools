@@ -6,6 +6,7 @@ from typing import List, Optional, Tuple, cast
 from fastapi import APIRouter, Depends, UploadFile
 from langchain.schema import Document
 
+from src.configs.env_config import config
 from src.models.documents_models import (
     AddPDFResponse,
     DocumentMetadata,
@@ -19,8 +20,6 @@ from src.services.processors import DocumentsPreprocessing
 from src.services.vectorstore import ChromaStore
 
 router = APIRouter(prefix="/v1/documents", tags=["documents"])
-
-COLLECTION_NAME = "pdf_documents"
 
 
 async def _process_pdf_file(
@@ -113,7 +112,7 @@ async def add_pdf_document(
         added_count, skipped_count, skipped_sources = await store.add_documents(
             documents=chunks,
             ids=ids,
-            collection_name=COLLECTION_NAME,
+            collection_name=config.COLLECTION_NAME,
         )
 
         return AddPDFResponse(
@@ -173,7 +172,7 @@ async def update_pdf_document(
         added_count, docs_replaced, sources_updated = await store.replace_documents(
             documents=chunks,
             ids=ids,
-            collection_name=COLLECTION_NAME,
+            collection_name=config.COLLECTION_NAME,
         )
 
         return UpdatePDFResponse(
