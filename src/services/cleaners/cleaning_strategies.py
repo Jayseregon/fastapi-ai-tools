@@ -558,3 +558,365 @@ class SeticsWebCleanupStrategyFR(CleaningStrategy):
 
         # Trim leading/trailing whitespace
         return text.strip()
+
+
+class NavigationMenuRemovalStrategy(CleaningStrategy):
+    """Strategy to remove navigation menus and breadcrumbs from web pages."""
+
+    def __init__(self):
+        """Initialize navigation menu removal patterns."""
+        # Enhanced pattern to match various navigation sections
+        self._nav_pattern = re.compile(
+            r"(Navigation|Menu|Nav\s+bar|Breadcrumbs?|Main\s+menu|Site\s+menu"
+            r"|Primary\s+menu|Header\s+menu|Top\s+menu|Navbar)[^\n]*\n+.*?(?=\n\n\n)",
+            re.DOTALL | re.IGNORECASE,
+        )
+
+        # Enhanced pattern to match common site menu sections with more variations
+        self._site_menu_pattern = re.compile(
+            r"(Home|Search|About|Contact|Login|Sign up|Sign in|Register|FAQ|Help|Support"
+            r"|Products|Services|Blog|News|Shop|Cart|Account|Profile|Dashboard)[^\n]*\n+"
+            r"(Home|Search|About|Contact|Login|Sign up|Sign in|Register|FAQ|Help|Support"
+            r"|Products|Services|Blog|News|Shop|Cart|Account|Profile|Dashboard)[^\n]*\n+",
+            re.DOTALL | re.IGNORECASE,
+        )
+
+        # Enhanced pattern to match various pagination patterns
+        self._pagination_pattern = re.compile(
+            r"(Previous|Next|Page \d+ of \d+|\d+ - \d+ of \d+|First|Last"
+            r"|Older|Newer|Back|Forward|Results per page)[^\n]*\n[^\n]*\n",
+            re.DOTALL | re.IGNORECASE,
+        )
+
+    async def clean(self, text: str) -> str:
+        """Remove navigation menus from web page text."""
+        # Remove navigation elements
+        text = self._nav_pattern.sub("", text)
+
+        # Remove site menu sections
+        text = self._site_menu_pattern.sub("", text)
+
+        # Remove pagination elements
+        text = self._pagination_pattern.sub("", text)
+
+        return text
+
+
+class WebHeaderFooterRemovalStrategy(CleaningStrategy):
+    """Strategy to remove common web page headers and footers."""
+
+    def __init__(self):
+        """Initialize web header/footer removal patterns."""
+        # Enhanced pattern to match various website headers
+        self._header_pattern = re.compile(
+            r"^.*?(Home\s+page|Main\s+page|Sign\s+in|Log\s+in|Register|Search"
+            r"|Menu|Skip\s+to\s+content|Welcome|Subscribe|Newsletter"
+            r"|Language|Login|Logout|My\s+Account)[^\n]*\n+",
+            re.DOTALL | re.IGNORECASE,
+        )
+
+        # Enhanced pattern to match various footer elements
+        self._footer_pattern = re.compile(
+            r"\n+(Copyright|©|All\s+rights\s+reserved|Terms\s+of\s+Service"
+            r"|Privacy\s+Policy|Contact\s+Us|About\s+Us|Powered\s+by"
+            r"|Sitemap|Legal|Disclaimer|Accessibility|Cookies"
+            r"|Newsletter|Subscribe)[^\n]+(\n.*?){0,5}$",
+            re.DOTALL | re.IGNORECASE,
+        )
+
+        # Enhanced pattern to match various social media sections
+        self._social_pattern = re.compile(
+            r"(facebook|twitter|linkedin|youtube|github|instagram|tiktok|pinterest"
+            r"|Follow\s+us|Connect\s+with\s+us|Share|Social\s+Media)"
+            r"[^\n]*\n[^\n]*\n[^\n]*\n+",
+            re.DOTALL | re.IGNORECASE,
+        )
+
+    async def clean(self, text: str) -> str:
+        """Remove headers and footers from web page text."""
+        # Remove header elements
+        text = self._header_pattern.sub("", text)
+
+        # Remove footer elements
+        text = self._footer_pattern.sub("", text)
+
+        # Remove social media sections
+        text = self._social_pattern.sub("", text)
+
+        return text
+
+
+class CookieBannerRemovalStrategy(CleaningStrategy):
+    """Strategy to remove cookie consent banners and popups."""
+
+    def __init__(self):
+        """Initialize cookie banner removal patterns."""
+        # Enhanced pattern to match various cookie consent messages
+        self._cookie_pattern = re.compile(
+            r"(This\s+website\s+uses\s+cookies|Cookie\s+Policy|Accept\s+cookies|Allow\s+cookies"
+            r"|We\s+use\s+cookies|Cookies?\s+Notice|Cookies?\s+settings|Manage\s+cookies"
+            r"|By\s+continuing\s+to\s+browse|We\s+value\s+your\s+privacy)"
+            r"[^\n]*\n+[^\n]*\n+[^\n]*\n+",
+            re.DOTALL | re.IGNORECASE,
+        )
+
+        # Enhanced pattern to match various privacy/GDPR notices
+        self._gdpr_pattern = re.compile(
+            r"(GDPR|Privacy\s+settings|Your\s+privacy|Privacy\s+choices"
+            r"|Data\s+protection|Privacy\s+preference|Cookie\s+preferences"
+            r"|Privacy\s+Notice|Accept\s+all|Reject\s+all)"
+            r"[^\n]*\n+[^\n]*\n+[^\n]*\n+",
+            re.DOTALL | re.IGNORECASE,
+        )
+
+    async def clean(self, text: str) -> str:
+        """Remove cookie banners from web page text."""
+        # Remove cookie consent text
+        text = self._cookie_pattern.sub("", text)
+
+        # Remove GDPR notices
+        text = self._gdpr_pattern.sub("", text)
+
+        return text
+
+
+class SidebarRemovalStrategy(CleaningStrategy):
+    """Strategy to remove sidebars with related links, categories, etc."""
+
+    def __init__(self):
+        """Initialize sidebar removal patterns."""
+        # Enhanced pattern to match various sidebar sections
+        self._sidebar_pattern = re.compile(
+            r"(Related\s+Links|Categories|Recent\s+Posts|Archives|Tags|Popular\s+Posts"
+            r"|Most\s+Read|Trending|Featured|Related\s+Articles|Similar\s+Posts"
+            r"|Recommended|You\s+might\s+also\s+like|Top\s+Stories|Latest\s+News"
+            r"|Quick\s+Links|Menu|Topics|Sections)[^\n]*\n+(?:(?!\n\n).*\n)+",
+            re.DOTALL | re.IGNORECASE,
+        )
+
+        # Enhanced pattern to match various table of contents
+        self._toc_sidebar_pattern = re.compile(
+            r"(On\s+this\s+page|Table\s+of\s+Contents|Contents|In\s+this\s+article"
+            r"|Jump\s+to\s+section|Skip\s+to|Article\s+contents|Page\s+contents"
+            r"|What's\s+in\s+this\s+guide|Article\s+sections)[^\n]*\n+(?:(?!\n\n).*\n)+",
+            re.DOTALL | re.IGNORECASE,
+        )
+
+    async def clean(self, text: str) -> str:
+        """Remove sidebar elements from web page text."""
+        # Remove sidebar sections
+        text = self._sidebar_pattern.sub("", text)
+
+        # Remove table of contents in sidebar
+        text = self._toc_sidebar_pattern.sub("", text)
+
+        return text
+
+
+class AdvertisementRemovalStrategy(CleaningStrategy):
+    """Strategy to remove advertisements and promotional content."""
+
+    def __init__(self):
+        """Initialize advertisement removal patterns."""
+        # Pattern to match common ad indicators
+        self._ad_pattern = re.compile(
+            r"(Advertisement|Sponsored|Promotion|Ad\s+by|Promoted\s+by"
+            r"|Recommended\s+for\s+you|Special\s+offer|Limited\s+time\s+offer"
+            r"|Subscribe\s+now|Sign\s+up\s+today|Try\s+for\s+free)[^\n]*\n+(?:(?!\n\n).*\n){0,5}",
+            re.DOTALL | re.IGNORECASE,
+        )
+
+        # Pattern to match product promotions
+        self._promo_pattern = re.compile(
+            r"(Buy\s+now|Get\s+\d+%\s+off|Only\s+\$\d+\.\d+|Free\s+shipping"
+            r"|Limited\s+stock|Sale\s+ends|Special\s+discount)[^\n]*\n+(?:(?!\n\n).*\n){0,3}",
+            re.DOTALL | re.IGNORECASE,
+        )
+
+    async def clean(self, text: str) -> str:
+        """Remove advertisements from web page text."""
+        # Remove ad sections
+        text = self._ad_pattern.sub("", text)
+
+        # Remove promotional content
+        text = self._promo_pattern.sub("", text)
+
+        return text
+
+
+class MarkupRemovalStrategy(CleaningStrategy):
+    """Strategy to remove leftover HTML/CSS/JavaScript elements in text."""
+
+    def __init__(self):
+        """Initialize markup removal patterns."""
+        # Enhanced pattern to match HTML tags
+        self._html_tag_pattern = re.compile(r"<[^>]+>", re.DOTALL)
+
+        # Enhanced pattern to match CSS class indicators
+        self._css_pattern = re.compile(r"\.\w+(-\w+)*\s*{[^}]*}", re.DOTALL)
+
+        # Enhanced pattern to match JavaScript fragments
+        self._js_pattern = re.compile(
+            r"(function\s*\([^)]*\)\s*{[^}]*}|var\s+\w+\s*=|const\s+\w+\s*=|let\s+\w+\s*=|"
+            r"document\.getElementById|window\.|if\s*\([^)]*\)\s*{)",
+            re.DOTALL,
+        )
+
+        # Pattern to match URL parameters
+        self._url_params_pattern = re.compile(r"\?[a-zA-Z0-9_=&%-]+", re.DOTALL)
+
+        # Pattern to match data attributes
+        self._data_attr_pattern = re.compile(
+            r"data-[a-z0-9-]+=\"[^\"]*\"", re.DOTALL | re.IGNORECASE
+        )
+
+    async def clean(self, text: str) -> str:
+        """Remove markup elements from web page text."""
+        # Remove HTML tags
+        text = self._html_tag_pattern.sub("", text)
+
+        # Remove CSS fragments
+        text = self._css_pattern.sub("", text)
+
+        # Remove JavaScript fragments
+        text = self._js_pattern.sub("", text)
+
+        # Remove URL parameters
+        text = self._url_params_pattern.sub("", text)
+
+        # Remove data attributes
+        text = self._data_attr_pattern.sub("", text)
+
+        return text
+
+
+class WebSpecificWhitespaceCleanupStrategy(CleaningStrategy):
+    """Strategy specifically for cleaning web-specific whitespace issues."""
+
+    def __init__(self):
+        """Initialize web whitespace cleanup patterns."""
+        # Pattern to match excessive consecutive newlines (3 or more)
+        self._excessive_newlines = re.compile(r"\n{3,}")
+
+        # Pattern to match Unicode special spaces
+        self._special_spaces = re.compile(
+            r"[\u00A0\u2000-\u200F\u2028-\u202F\u205F\u3000]"
+        )
+
+        # Pattern to clean up list formatting
+        self._list_cleanup = re.compile(
+            r"(\n\s*[-•*]\s*[^\n]+)(\n+)(?=\s*[-•*]\s*)", re.DOTALL
+        )
+
+        # Clean up spacing at section boundaries
+        self._section_boundary = re.compile(
+            r"(\n#{1,6}\s+[^\n]+\n)(\n+)(#{1,6}\s+)", re.DOTALL
+        )
+
+        # Pattern to fix no-break spaces and other special characters
+        self._special_chars = re.compile(
+            r"[\u2013\u2014\u2018\u2019\u201C\u201D\u2026]"
+        )
+
+        # Pattern to fix inconsistent list markers
+        self._list_markers = re.compile(r"\n\s*[•\-\*○●◦□■◆▪▫]\s*", re.DOTALL)
+
+    async def clean(self, text: str) -> str:
+        """Clean up web-specific whitespace issues."""
+        # Replace special Unicode spaces with regular spaces
+        text = self._special_spaces.sub(" ", text)
+
+        # Normalize special characters to ASCII equivalents
+        text = self._special_chars.sub(
+            lambda m: {
+                "\u2013": "-",
+                "\u2014": "--",
+                "\u2018": "'",
+                "\u2019": "'",
+                "\u201c": '"',
+                "\u201d": '"',
+                "\u2026": "...",
+            }.get(m.group(0), m.group(0)),
+            text,
+        )
+
+        # Normalize list markers
+        text = self._list_markers.sub("\n• ", text)
+
+        # Fix list item spacing
+        text = self._list_cleanup.sub(r"\1\n", text)
+
+        # Fix section heading spacing
+        text = self._section_boundary.sub(r"\1\n\3", text)
+
+        # Normalize excessive newlines to double newlines
+        text = self._excessive_newlines.sub("\n\n", text)
+
+        # Clean trailing/leading whitespace
+        text = text.strip()
+
+        return text
+
+
+class WebPageFeedbackCleanupStrategy(CleaningStrategy):
+    """Strategy to remove feedback forms and rating sections."""
+
+    def __init__(self):
+        """Initialize feedback section removal patterns."""
+        # Enhanced pattern to match various feedback sections
+        self._feedback_pattern = re.compile(
+            r"(Was\s+this\s+page\s+helpful|Rate\s+this\s+page|Give\s+feedback|Send\s+feedback"
+            r"|How\s+useful\s+was\s+this|Did\s+you\s+find\s+this|Leave\s+a\s+comment"
+            r"|Share\s+your\s+thoughts|What\s+do\s+you\s+think|Tell\s+us\s+what\s+you\s+think)"
+            r"[^\n]*\n+(?:(?!\n\n).*\n)+",
+            re.DOTALL | re.IGNORECASE,
+        )
+
+        # Enhanced pattern to match various rating elements
+        self._rating_pattern = re.compile(
+            r"(Yes|No|Maybe|[1-5]\s+stars?|Rating:\s*\d+/\d+|Helpful|Not\s+helpful"
+            r"|Like|Dislike|Thumbs\s+up|Thumbs\s+down|Recommend|Would\s+not\s+recommend)"
+            r"[^\n]*\n+[^\n]*\n+",
+            re.DOTALL | re.IGNORECASE,
+        )
+
+    async def clean(self, text: str) -> str:
+        """Remove feedback and rating elements from web page text."""
+        # Remove feedback sections
+        text = self._feedback_pattern.sub("", text)
+
+        # Remove rating elements
+        text = self._rating_pattern.sub("", text)
+
+        return text
+
+
+class SocialShareRemovalStrategy(CleaningStrategy):
+    """Strategy to remove social sharing buttons and sections."""
+
+    def __init__(self):
+        """Initialize social share removal patterns."""
+        # Pattern to match share sections
+        self._share_pattern = re.compile(
+            r"(Share\s+this|Share\s+on|Share\s+via|Share\s+with|Share\s+to"
+            r"|Tweet|Pin\s+it|Email\s+this|Send\s+to|Forward\s+to)"
+            r"[^\n]*\n+(?:(?!\n\n).*\n){0,3}",
+            re.DOTALL | re.IGNORECASE,
+        )
+
+        # Pattern to match social media icon groups
+        self._social_icons_pattern = re.compile(
+            r"(facebook|twitter|linkedin|youtube|pinterest|instagram|whatsapp|telegram|reddit)"
+            r"[^\n]*\n+(facebook|twitter|linkedin|youtube|pinterest|instagram|whatsapp|telegram|reddit)",
+            re.DOTALL | re.IGNORECASE,
+        )
+
+    async def clean(self, text: str) -> str:
+        """Remove social sharing elements from web page text."""
+        # Remove share sections
+        text = self._share_pattern.sub("", text)
+
+        # Remove social media icon groups
+        text = self._social_icons_pattern.sub("", text)
+
+        return text
