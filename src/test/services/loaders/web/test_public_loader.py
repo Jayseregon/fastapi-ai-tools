@@ -369,8 +369,10 @@ class TestPublicLoader:
         # Load document with error
         result = await public_loader.load_single_document("https://example.com")
 
-        # Verify None was returned on error
-        assert result is None
+        # Verify an empty document was returned
+        assert isinstance(result, Document)
+        assert result.page_content == ""
+        assert result.metadata == {}
 
     @pytest.mark.asyncio
     async def test_load_single_document_auto_initialize(self, public_loader):
@@ -463,8 +465,8 @@ class TestPublicLoader:
             "https://example.com"
         )
 
-        # Verify None was returned on error
-        assert result is None
+        # Verify empty list was returned on error
+        assert result == []
 
     @pytest.mark.asyncio
     async def test_load_single_document_with_images_auto_initialize(
