@@ -107,7 +107,9 @@ class ChromaStore:
             embedding_function=self.embedding_function,
         )
 
-    async def _get_source_tracker(self, collection_name: str) -> Set[str]:
+    async def _get_source_tracker(
+        self, collection_name: str, is_web: bool = False
+    ) -> Set[str]:
         """
         Get set of sources already stored in a collection.
 
@@ -148,7 +150,9 @@ class ChromaStore:
                 if metadata and "source" in metadata:
                     # Extract only the filename from the full path
                     source_path = metadata["source"]
-                    source_filename = os.path.basename(source_path)
+                    source_filename = (
+                        os.path.basename(source_path) if not is_web else source_path
+                    )
                     sources.add(source_filename)
                     batch_sources += 1
 
@@ -193,6 +197,7 @@ class ChromaStore:
         collection_name: str = "default_collection",
         batch_size: int = 50,
         skip_existing: bool = True,
+        is_web: bool = False,
     ) -> Tuple[int, int, List[str]]:
         """
         Store documents with their embeddings in the vector store, skipping documents
@@ -222,7 +227,9 @@ class ChromaStore:
             raise ValueError("No documents provided for storage.")
 
         # First, get existing sources (now contains just filenames)
-        existing_sources = await self._get_source_tracker(collection_name)
+        existing_sources = await self._get_source_tracker(
+            collection_name=collection_name, is_web=is_web
+        )
         logger.debug(f"Found {len(existing_sources)} existing sources in collection")
         logger.debug(f"EXISTING SOURCES: {existing_sources}")
 
@@ -232,7 +239,7 @@ class ChromaStore:
             source = doc.metadata.get("source")
             if source:
                 # Extract the filename from the full path
-                source_filename = os.path.basename(source)
+                source_filename = os.path.basename(source) if not is_web else source
                 if source_filename not in docs_by_source:
                     docs_by_source[source_filename] = []
                 docs_by_source[source_filename].append(i)
@@ -315,6 +322,7 @@ class ChromaStore:
         ids: List[str],
         collection_name: str = "default_collection",
         batch_size: int = 50,
+        is_web: bool = False,
     ) -> Tuple[int, int, int]:
         """
         Replace existing documents with new versions by deleting old chunks and adding new ones.
@@ -343,7 +351,7 @@ class ChromaStore:
         for doc in documents:
             source = doc.metadata.get("source")
             if source:
-                source_filename = os.path.basename(source)
+                source_filename = os.path.basename(source) if not is_web else source
                 document_source_filenames.add(source_filename)
 
         logger.debug(
@@ -369,7 +377,10 @@ class ChromaStore:
                 for i, metadata in enumerate(results["metadatas"]):
                     if metadata and "source" in metadata:
                         doc_source = metadata["source"]
-                        if os.path.basename(doc_source) == source_filename:
+                        doc_source_basename = (
+                            os.path.basename(doc_source) if not is_web else doc_source
+                        )
+                        if doc_source_basename == source_filename:
                             docs_to_delete.append(results["ids"][i])
 
                 if docs_to_delete:

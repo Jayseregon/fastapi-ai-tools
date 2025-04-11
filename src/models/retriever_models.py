@@ -24,11 +24,6 @@ class RetrieverResponse(BaseModel):
 
 
 class QueryRequest(BaseModel):
-    """Request model for vector store queries.
-
-    This model defines the structure and validation for retriever query requests.
-    """
-
     query: str = Field(
         ...,
         description="The search query to find matching documents in the vector store",
