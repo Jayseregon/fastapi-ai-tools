@@ -1,7 +1,7 @@
 # fastapi-ai-tools
 
-[![Version](https://img.shields.io/badge/version-0.2.5.0303-blue)](https://github.com/jayseregon/programming/fastapi/fastapi-ai-tools)
-[![Last Updated](https://img.shields.io/badge/last%20updated-2025.03.03-brightgreen)](https://github.com/jayseregon/programming/fastapi/fastapi-ai-tools)
+[![Version](https://img.shields.io/badge/version-0.3.6.0415-blue)](https://github.com/jayseregon/programming/fastapi/fastapi-ai-tools)
+[![Last Updated](https://img.shields.io/badge/last%20updated-2025.04.15-brightgreen)](https://github.com/jayseregon/programming/fastapi/fastapi-ai-tools)
 
 **fastapi-ai-tools** is an internal FastAPI-based web API designed to integrate AI and RAG tools with Python for company use. This repository is private and intended exclusively for internal purposes. Its deployed to Azure under **RAG AI Toolbox**.
 
