@@ -231,7 +231,6 @@ class ChromaStore:
             collection_name=collection_name, is_web=is_web
         )
         logger.debug(f"Found {len(existing_sources)} existing sources in collection")
-        logger.debug(f"EXISTING SOURCES: {existing_sources}")
 
         # Group documents by source filename (not full path)
         docs_by_source: Dict[str, List[int]] = {}

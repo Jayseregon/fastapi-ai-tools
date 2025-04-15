@@ -27,6 +27,9 @@ class GlobalConfig(BaseConfig):
     SETICS_USER: Optional[str] = None
     SETICS_PWD: Optional[str] = None
     COLLECTION_NAME: str = "knowledge_base"
+    AZURE_STORAGE_CONTAINER_NAME: Optional[str] = None
+    AZURE_STORAGE_CONNECTION_STRING: Optional[str] = None
+    AZURE_STORAGE_ACCOUNT_NAME: Optional[str] = None
 
     @property
     def get_allowed_issuers(self) -> list[str]:

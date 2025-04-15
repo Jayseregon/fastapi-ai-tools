@@ -3,9 +3,10 @@ import logging
 import os
 import shutil
 import tempfile
+from pathlib import Path
 from typing import List, Optional, Tuple, cast
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Body, Depends, HTTPException, UploadFile
 from langchain.schema import Document
 
 from src.configs.env_config import config
@@ -21,6 +22,7 @@ from src.services.cleaners import PdfDocumentCleaner, WebDocumentCleaner
 from src.services.loaders.files import PdfLoader
 from src.services.loaders.web import PublicLoader
 from src.services.processors import DocumentsPreprocessing
+from src.services.storages import BlobStorage
 from src.services.vectorstore import ChromaStore
 
 # Set up logging
@@ -75,6 +77,48 @@ async def _process_pdf_file(
     chunks, ids = await processor(documents=cleaned_docs)
 
     return chunks, ids, original_filename, doc_metadata_abstract
+
+
+async def _blob_storage_process_pdf_file(
+    blob_name: str,
+    temp_dir: str | Path,
+) -> Tuple[List[Document], List[str], DocumentMetadata]:
+    """
+    Process a PDF file stored in Azure Blob Storage.
+
+    Downloads the blob, loads and cleans the document, and processes it into chunks.
+
+    Args:
+        blob_name (str): The name of the blob in Azure Blob Storage.
+        temp_dir (str | Path): The directory to save the downloaded blob.
+
+    Returns:
+        Tuple[List[Document], List[str], str, DocumentMetadata]:
+            - chunks: List of processed Document objects.
+            - ids: List of unique identifiers for each document chunk.
+            - doc_metadata_abstract: Metadata extracted from the first document.
+    """
+    async with BlobStorage() as storage:
+        temp_pdf_path = await storage.download_blob(
+            blob_name=blob_name,
+            temp_dir=temp_dir,
+        )
+
+    # Load document from pdf input file
+    async with PdfLoader() as loader:
+        raw_docs = await loader.load_document(temp_pdf_path)
+
+    # Clean the loaded documents
+    cleaner = PdfDocumentCleaner()
+    cleaned_docs = await cleaner.clean_documents(documents=raw_docs)
+
+    doc_metadata_abstract: DocumentMetadata = cleaned_docs[0].metadata
+
+    # Process the cleaned documents to create chunks and ids
+    processor = DocumentsPreprocessing()
+    chunks, ids = await processor(documents=cleaned_docs)
+
+    return chunks, ids, doc_metadata_abstract
 
 
 async def _process_web_url(
@@ -181,6 +225,74 @@ async def add_pdf_document(
     except Exception as e:
         logger.error(f"Error loading pdf file: {str(e)}")
         raise HTTPException(status_code=503, detail=f"Error loading pdf file: {str(e)}")
+
+    finally:
+        if os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)
+
+
+@router.post(
+    "/pdf/add-from-azure", response_model=AddDocumentsResponse, status_code=200
+)
+async def add_pdf_document_from_azure(
+    blob_name: str = Body(
+        ..., embed=True, description="Blob name in Azure Blob Storage"
+    ),
+    rate: Optional[None] = Depends(RateLimiter(times=3, seconds=10)),
+) -> AddDocumentsResponse:
+    """
+    Add a new PDF document to the vector store from Azure Blob Storage.
+
+    This endpoint downloads a PDF from Azure Blob Storage, processes it, and adds its contents
+    to the vector database for future retrieval and querying.
+
+    Args:
+        blob_name (str): The name of the blob in Azure Blob Storage.
+        rate (Optional[None]): Rate limiter dependency.
+
+    Returns:
+        AddDocumentsResponse: Details about the operation, including status, filename, store metadata,
+        added/skipped counts, skipped sources, and sample document metadata.
+
+    Raises:
+        HTTPException: If the file cannot be processed or added to the vector store.
+    """
+    temp_dir = tempfile.mkdtemp()
+
+    try:
+        # "https://djangomaticstorage.blob.core.windows.net/next-client-storage/chatbot/4.1 XNS List of Preferred Plant Materials.pdf"
+
+        # 4.1 XNS List of Preferred Plant Materials.pdf
+
+        # Process the PDF file from Azure Blob Storage
+        chunks, ids, doc_metadata_abstract = await _blob_storage_process_pdf_file(
+            blob_name=blob_name,
+            temp_dir=temp_dir,
+        )
+
+        # Add the documents to the vector store
+        store = ChromaStore()
+        added_count, skipped_count, skipped_sources = await store.add_documents(
+            documents=chunks,
+            ids=ids,
+            collection_name=config.COLLECTION_NAME,
+        )
+
+        return AddDocumentsResponse(
+            status="success",
+            filename=blob_name,
+            store_metadata=StoreMetadata.model_validate(store.store_metadata),
+            added_count=added_count,
+            skipped_count=skipped_count,
+            skipped_sources=skipped_sources,
+            doc_sample_meta=doc_metadata_abstract,
+        )
+
+    except Exception as e:
+        logger.error(f"Error loading pdf from Azure: {str(e)}")
+        raise HTTPException(
+            status_code=503, detail=f"Error loading pdf from Azure: {str(e)}"
+        )
 
     finally:
         if os.path.exists(temp_dir):
