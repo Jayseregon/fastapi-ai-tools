@@ -1,5 +1,6 @@
 import logging
 from contextlib import asynccontextmanager
+from typing import Optional
 
 import redis.asyncio as redis
 from asgi_correlation_id import CorrelationIdMiddleware
@@ -13,13 +14,14 @@ from fastapi.security import OAuth2PasswordBearer
 from src.configs.env_config import config
 from src.configs.log_config import configure_logging
 from src.models.user import User
-from src.routes.embedding import router as embedding_router
+from src.routes.chroma_infos_router import router as chroma_router
+from src.routes.documents_router import router as documents_router
+from src.routes.neo4j_infos_router import router as neo4j_router
+from src.routes.retriever_router import router as retriever_router
 from src.security.jwt_auth import validate_token
 from src.security.rateLimiter import FastAPILimiter
 from src.security.rateLimiter.depends import RateLimiter
-from src.services.chromaData import router as chroma_router
 from src.services.db import chroma_service, neo4j_service
-from src.services.graphData import router as graph_router
 
 # Initialize logging
 logger = logging.getLogger(__name__)
@@ -59,7 +61,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
 @app.get("/", response_class=HTMLResponse)
-async def read_root(rate: None = Depends(RateLimiter(times=3, seconds=10))):
+async def read_root(rate: Optional[None] = Depends(RateLimiter(times=3, seconds=10))):
     return """
     <!DOCTYPE html>
     <html>
@@ -96,14 +98,15 @@ async def read_root(rate: None = Depends(RateLimiter(times=3, seconds=10))):
 @app.get("/users/me")
 async def read_users_me(
     current_user: User = Depends(validate_token),
-    rate: None = Depends(RateLimiter(times=3, seconds=10)),
+    rate: Optional[None] = Depends(RateLimiter(times=3, seconds=10)),
 ):
     return current_user
 
 
-app.include_router(embedding_router)
-app.include_router(graph_router)
+app.include_router(documents_router)
+app.include_router(retriever_router)
 app.include_router(chroma_router)
+app.include_router(neo4j_router)
 
 
 @app.exception_handler(HTTPException)

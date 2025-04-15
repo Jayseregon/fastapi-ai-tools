@@ -26,6 +26,14 @@ def test_global_config_defaults():
     assert config.OPENAI_API_KEY is None
     assert config.ALLOWED_HOSTS == ""
     assert config.REDIS_URL is None
+    assert config.NEO4J_USER is None
+    assert config.NEO4J_PWD is None
+    assert config.NEO4J_URI is None
+    assert config.CHROMADB_HOST is None
+    assert config.CHROMADB_PORT is None
+    assert config.CHROMA_CLIENT_AUTH_CREDENTIALS is None
+    assert config.SETICS_USER is None
+    assert config.SETICS_PWD is None
 
 
 def test_global_config_allowed_hosts():
@@ -84,12 +92,32 @@ def test_get_config_invalid_env(monkeypatch):
                 "TEST_OPENAI_API_KEY": "test-key",
                 "TEST_ALLOWED_HOSTS": "localhost,test.com",
                 "TEST_REDIS_URL": "redis://localhost",
+                "TEST_NEO4J_USER": "neo4j_test_user",
+                "TEST_NEO4J_PWD": "neo4j_test_password",
+                "TEST_NEO4J_URI": "bolt://localhost:7687",
+                "TEST_CHROMADB_HOST": "localhost",
+                "TEST_CHROMADB_PORT": "8000",
+                "TEST_CHROMA_CLIENT_AUTH_CREDENTIALS": "test-auth-token",
+                "TEST_SETICS_USER": "setics_test_user",
+                "TEST_SETICS_PWD": "setics_test_password",
             },
             {
                 "OPENAI_API_KEY": "test-key",
                 "ALLOWED_HOSTS": "localhost,test.com",
                 "REDIS_URL": "redis://localhost",
+                "NEO4J_USER": "neo4j_test_user",
+                "NEO4J_PWD": "neo4j_test_password",
+                "NEO4J_URI": "bolt://localhost:7687",
+                "CHROMADB_HOST": "localhost",
+                "CHROMADB_PORT": 8000,
+                "CHROMA_CLIENT_AUTH_CREDENTIALS": "test-auth-token",
+                "SETICS_USER": "setics_test_user",
+                "SETICS_PWD": "setics_test_password",
             },
+        ),
+        (
+            {},
+            {},
         ),
     ],
 )

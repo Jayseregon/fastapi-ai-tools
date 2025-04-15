@@ -1,5 +1,6 @@
 import os
 import time
+import warnings
 from typing import AsyncGenerator, Generator
 from unittest.mock import AsyncMock
 
@@ -70,3 +71,23 @@ async def mock_rate_limiter():
     yield
     if FastAPILimiter.redis:
         await FastAPILimiter.close()
+
+
+def pytest_configure(config):
+    """Configure pytest to ignore specific deprecation warnings."""
+    # Filter out SWIG-related deprecation warnings
+    warnings.filterwarnings(
+        "ignore",
+        message=r"builtin type SwigPyPacked has no __module__ attribute",
+        category=DeprecationWarning,
+    )
+    warnings.filterwarnings(
+        "ignore",
+        message=r"builtin type SwigPyObject has no __module__ attribute",
+        category=DeprecationWarning,
+    )
+    warnings.filterwarnings(
+        "ignore",
+        message=r"builtin type swigvarlink has no __module__ attribute",
+        category=DeprecationWarning,
+    )
