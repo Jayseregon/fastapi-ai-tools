@@ -31,54 +31,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1/documents", tags=["Documents Pipeline"])
 
 
-async def _process_pdf_file(
-    pdf_file: UploadFile, temp_dir: str
-) -> Tuple[List[Document], List[str], str, DocumentMetadata]:
-    """Process the uploaded PDF file.
-
-    This function handles the complete PDF processing workflow:
-    1. Saves the uploaded file to a temporary directory
-    2. Loads the document content using PdfLoader
-    3. Cleans the document content with PdfDocumentCleaner
-    4. Processes the document into chunks with DocumentsPreprocessing
-
-    Args:
-        pdf_file: The uploaded PDF file object
-        temp_dir: Directory path where the file will be temporarily stored
-
-    Returns:
-        A tuple containing:
-        - chunks: List of processed Document objects ready for vectorization
-        - ids: List of unique identifiers for each document chunk
-        - original_filename: The original name of the uploaded file
-        - doc_metadata_abstract: Metadata extracted from the first document
-    """
-
-    # Use the original filename with explicit type cast to satisfy mypy
-    original_filename = cast(str, pdf_file.filename or "unnamed_document.pdf")
-    temp_path = os.path.join(temp_dir, original_filename)
-
-    # Save the uploaded file with its original name
-    with open(temp_path, "wb") as f:
-        shutil.copyfileobj(pdf_file.file, f)
-
-    # Load document from pdf input file
-    async with PdfLoader() as loader:
-        raw_docs = await loader.load_document(temp_path)
-
-    # Clean the loaded documents
-    cleaner = PdfDocumentCleaner()
-    cleaned_docs = await cleaner.clean_documents(documents=raw_docs)
-
-    doc_metadata_abstract: DocumentMetadata = cleaned_docs[0].metadata
-
-    # Process the cleaned documents to create chunks and ids
-    processor = DocumentsPreprocessing()
-    chunks, ids = await processor(documents=cleaned_docs)
-
-    return chunks, ids, original_filename, doc_metadata_abstract
-
-
 async def _blob_storage_process_pdf_file(
     blob_name: str,
     temp_dir: str | Path,
@@ -170,22 +122,25 @@ async def _process_web_url(
 
 @router.post("/pdf/add", response_model=AddDocumentsResponse, status_code=200)
 async def add_pdf_document(
-    pdf_file: UploadFile,
+    blob_name: str = Body(
+        ..., embed=True, description="Blob name in Azure Blob Storage"
+    ),
     rate: Optional[None] = Depends(RateLimiter(times=3, seconds=10)),
 ) -> AddDocumentsResponse:
-    """Add a new PDF document to the vector store.
+    """
+    Add a new PDF document from Azure Blob Storage to the vector store.
 
-    This endpoint processes a PDF file and adds its contents to the vector database for
-    future retrieval and querying. The document is chunked, cleaned, and indexed.
+    This endpoint is designed for AI agents and tools to process a PDF file stored in Azure Blob Storage.
+    The PDF is downloaded, cleaned, chunked, and indexed in the vector database for future retrieval and querying.
 
     Args:
-        pdf_file: The PDF file to be uploaded and processed
-        rate: Rate limiter dependency to prevent abuse (3 requests per 10 seconds)
+        blob_name (str): The name of the blob in Azure Blob Storage to process.
+        rate (Optional[None]): Rate limiter dependency to prevent abuse (3 requests per 10 seconds).
 
     Returns:
         AddDocumentsResponse: Object containing details about the operation, including:
             - status: Operation result status
-            - filename: Original filename of the processed document
+            - filename: Name of the processed blob
             - store_metadata: Information about the vector store
             - added_count: Number of chunks successfully added to the store
             - skipped_count: Number of chunks skipped (e.g., duplicates)
@@ -193,77 +148,11 @@ async def add_pdf_document(
             - doc_sample_meta: Sample metadata from the document
 
     Raises:
-        HTTPException: If the file cannot be processed or added to the vector store
+        HTTPException: If the blob cannot be processed or added to the vector store.
     """
     temp_dir = tempfile.mkdtemp()
 
     try:
-        # Process the uploaded PDF file
-        chunks, ids, original_filename, doc_metadata_abstract = await _process_pdf_file(
-            pdf_file=pdf_file,
-            temp_dir=temp_dir,
-        )
-
-        # Add the documents to the vector store
-        store = ChromaStore()
-        added_count, skipped_count, skipped_sources = await store.add_documents(
-            documents=chunks,
-            ids=ids,
-            collection_name=config.COLLECTION_NAME,
-        )
-
-        return AddDocumentsResponse(
-            status="success",
-            filename=original_filename,
-            store_metadata=StoreMetadata.model_validate(store.store_metadata),
-            added_count=added_count,
-            skipped_count=skipped_count,
-            skipped_sources=skipped_sources,
-            doc_sample_meta=doc_metadata_abstract,
-        )
-
-    except Exception as e:
-        logger.error(f"Error loading pdf file: {str(e)}")
-        raise HTTPException(status_code=503, detail=f"Error loading pdf file: {str(e)}")
-
-    finally:
-        if os.path.exists(temp_dir):
-            shutil.rmtree(temp_dir)
-
-
-@router.post(
-    "/pdf/add-from-azure", response_model=AddDocumentsResponse, status_code=200
-)
-async def add_pdf_document_from_azure(
-    blob_name: str = Body(
-        ..., embed=True, description="Blob name in Azure Blob Storage"
-    ),
-    rate: Optional[None] = Depends(RateLimiter(times=3, seconds=10)),
-) -> AddDocumentsResponse:
-    """
-    Add a new PDF document to the vector store from Azure Blob Storage.
-
-    This endpoint downloads a PDF from Azure Blob Storage, processes it, and adds its contents
-    to the vector database for future retrieval and querying.
-
-    Args:
-        blob_name (str): The name of the blob in Azure Blob Storage.
-        rate (Optional[None]): Rate limiter dependency.
-
-    Returns:
-        AddDocumentsResponse: Details about the operation, including status, filename, store metadata,
-        added/skipped counts, skipped sources, and sample document metadata.
-
-    Raises:
-        HTTPException: If the file cannot be processed or added to the vector store.
-    """
-    temp_dir = tempfile.mkdtemp()
-
-    try:
-        # "https://djangomaticstorage.blob.core.windows.net/next-client-storage/chatbot/4.1 XNS List of Preferred Plant Materials.pdf"
-
-        # 4.1 XNS List of Preferred Plant Materials.pdf
-
         # Process the PDF file from Azure Blob Storage
         chunks, ids, doc_metadata_abstract = await _blob_storage_process_pdf_file(
             blob_name=blob_name,
@@ -289,10 +178,8 @@ async def add_pdf_document_from_azure(
         )
 
     except Exception as e:
-        logger.error(f"Error loading pdf from Azure: {str(e)}")
-        raise HTTPException(
-            status_code=503, detail=f"Error loading pdf from Azure: {str(e)}"
-        )
+        logger.error(f"Error loading pdf file: {str(e)}")
+        raise HTTPException(status_code=503, detail=f"Error loading pdf file: {str(e)}")
 
     finally:
         if os.path.exists(temp_dir):
@@ -301,23 +188,26 @@ async def add_pdf_document_from_azure(
 
 @router.post("/pdf/update", response_model=UpdateDocumentsResponse, status_code=200)
 async def update_pdf_document(
-    pdf_file: UploadFile,
+    blob_name: str = Body(
+        ..., embed=True, description="Blob name in Azure Blob Storage"
+    ),
     rate: Optional[None] = Depends(RateLimiter(times=3, seconds=10)),
 ) -> UpdateDocumentsResponse:
-    """Update an existing PDF document in the vector store.
+    """
+    Update an existing PDF document in the vector store from Azure Blob Storage.
 
-    This endpoint processes a PDF file and updates its contents in the vector database.
-    If the document (identified by its content) already exists, it will be replaced.
-    The document is chunked, cleaned, and re-indexed.
+    This endpoint is designed for AI agents and tools to update the contents of a PDF file stored in Azure Blob Storage.
+    The PDF is downloaded, cleaned, chunked, and re-indexed in the vector database. If the document already exists,
+    its content will be replaced to ensure the most current version is available for retrieval and querying.
 
     Args:
-        pdf_file: The PDF file to be uploaded and processed for updating
-        rate: Rate limiter dependency to prevent abuse (3 requests per 10 seconds)
+        blob_name (str): The name of the blob in Azure Blob Storage to process.
+        rate (Optional[None]): Rate limiter dependency to prevent abuse (3 requests per 10 seconds).
 
     Returns:
         UpdateDocumentsResponse: Object containing details about the update operation, including:
             - status: Operation result status
-            - filename: Original filename of the processed document
+            - filename: Name of the processed blob
             - store_metadata: Information about the vector store
             - added_count: Number of chunks successfully added to the store
             - docs_replaced: Number of document chunks that were replaced
@@ -325,14 +215,14 @@ async def update_pdf_document(
             - doc_sample_meta: Sample metadata from the document
 
     Raises:
-        HTTPException: If the file cannot be processed or updated in the vector store
+        HTTPException: If the blob cannot be processed or updated in the vector store.
     """
     temp_dir = tempfile.mkdtemp()
 
     try:
-        # Process the uploaded PDF file
-        chunks, ids, original_filename, doc_metadata_abstract = await _process_pdf_file(
-            pdf_file=pdf_file,
+        # Process the PDF file from Azure Blob Storage
+        chunks, ids, doc_metadata_abstract = await _blob_storage_process_pdf_file(
+            blob_name=blob_name,
             temp_dir=temp_dir,
         )
 
@@ -346,7 +236,7 @@ async def update_pdf_document(
 
         return UpdateDocumentsResponse(
             status="success",
-            filename=original_filename,
+            filename=blob_name,
             store_metadata=StoreMetadata.model_validate(store.store_metadata),
             added_count=added_count,
             docs_replaced=docs_replaced,

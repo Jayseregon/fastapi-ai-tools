@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from fastapi import FastAPI
@@ -7,7 +7,7 @@ from langchain.schema import Document
 
 from src.configs.env_config import config
 from src.models.documents_models import WebUrlRequest
-from src.routes.documents_router import _process_pdf_file, _process_web_url, router
+from src.routes.documents_router import _process_web_url, router
 
 
 @pytest.fixture
@@ -104,31 +104,29 @@ def sample_web_request_with_images():
 
 class TestDocumentsRouter:
     @pytest.mark.asyncio
-    @patch("src.routes.documents_router.tempfile.mkdtemp")
-    @patch("src.routes.documents_router.shutil.copyfileobj")
-    @patch("src.routes.documents_router.open")
-    @patch("src.routes.documents_router.shutil.rmtree")
+    @patch("src.routes.documents_router.BlobStorage")
     @patch("src.routes.documents_router.PdfLoader")
     @patch("src.routes.documents_router.PdfDocumentCleaner")
     @patch("src.routes.documents_router.DocumentsPreprocessing")
-    async def test_process_pdf_file(
+    async def test_blob_storage_process_pdf_file(
         self,
         mock_processor_class,
         mock_cleaner_class,
         mock_loader_class,
-        mock_rmtree,
-        mock_open,
-        mock_copyfileobj,
-        mock_mkdtemp,
+        mock_blob_storage_class,
         mock_pdf_file,
         sample_document,
         sample_chunks,
         sample_chunk_ids,
     ):
-        """Test the internal _process_pdf_file function"""
-        # Setup mocks
-        mock_mkdtemp.return_value = "/tmp/test_dir"
-        mock_open.return_value = MagicMock()
+        """Test the internal _blob_storage_process_pdf_file function"""
+        from src.routes.documents_router import _blob_storage_process_pdf_file
+
+        # Setup BlobStorage mock
+        mock_blob_storage = AsyncMock()
+        mock_blob_storage.__aenter__.return_value = mock_blob_storage
+        mock_blob_storage.download_blob.return_value = "/tmp/test_dir/test_document.pdf"
+        mock_blob_storage_class.return_value = mock_blob_storage
 
         # Setup PDF loader mock
         mock_loader = AsyncMock()
@@ -146,19 +144,20 @@ class TestDocumentsRouter:
         mock_processor_class.return_value = mock_processor
 
         # Call function
-        result = await _process_pdf_file(mock_pdf_file, "/tmp/test_dir")
+        result = await _blob_storage_process_pdf_file(
+            "test_document.pdf", "/tmp/test_dir"
+        )
 
         # Verify results
-        chunks, ids, filename, metadata = result
+        chunks, ids, metadata = result
         assert chunks == sample_chunks
         assert ids == sample_chunk_ids
-        assert filename == "test_document.pdf"
         assert metadata == sample_document.metadata
 
-        # Verify file operations
-        mock_open.assert_called_once_with("/tmp/test_dir/test_document.pdf", "wb")
-        mock_copyfileobj.assert_called_once_with(
-            mock_pdf_file.file, mock_open.return_value.__enter__.return_value
+        # Verify BlobStorage download called
+        mock_blob_storage.download_blob.assert_called_once_with(
+            blob_name="test_document.pdf",
+            temp_dir="/tmp/test_dir",
         )
 
         # Verify service calls
@@ -171,7 +170,7 @@ class TestDocumentsRouter:
         mock_processor.assert_called_once_with(documents=[sample_document])
 
     @pytest.mark.asyncio
-    @patch("src.routes.documents_router._process_pdf_file")
+    @patch("src.routes.documents_router._blob_storage_process_pdf_file")
     @patch("src.routes.documents_router.ChromaStore")
     @patch("src.routes.documents_router.tempfile.mkdtemp")
     @patch("src.routes.documents_router.os.path.exists")
@@ -182,24 +181,21 @@ class TestDocumentsRouter:
         mock_exists,
         mock_mkdtemp,
         mock_chroma_store_class,
-        mock_process_pdf,
+        mock_blob_storage_process_pdf,
         test_client,
         mock_pdf_file,
         sample_chunks,
         sample_chunk_ids,
     ):
         """Test successful PDF document addition"""
-        # Setup mocks
         mock_mkdtemp.return_value = "/tmp/test_dir"
         mock_exists.return_value = True
-        mock_process_pdf.return_value = (
+        mock_blob_storage_process_pdf.return_value = (
             sample_chunks,
             sample_chunk_ids,
-            "test_document.pdf",
             {"source": "test_document.pdf", "title": "Test Document"},
         )
 
-        # Setup ChromaStore mock
         mock_store = AsyncMock()
         mock_store.add_documents.return_value = (2, 0, [])
         mock_store.store_metadata = {
@@ -208,20 +204,12 @@ class TestDocumentsRouter:
         }
         mock_chroma_store_class.return_value = mock_store
 
-        # Use test client to call the endpoint directly
         with patch("fastapi.Depends", return_value=None):
             response = test_client.post(
                 "/v1/documents/pdf/add",
-                files={
-                    "pdf_file": (
-                        "test_document.pdf",
-                        b"test content",
-                        "application/pdf",
-                    )
-                },
+                json={"blob_name": "test_document.pdf"},
             )
 
-        # Verify response
         assert response.status_code == 200
         response_data = response.json()
         assert response_data["status"] == "success"
@@ -229,18 +217,15 @@ class TestDocumentsRouter:
         assert response_data["added_count"] == 2
         assert response_data["skipped_count"] == 0
 
-        # Verify service calls
         mock_store.add_documents.assert_called_once_with(
             documents=sample_chunks,
             ids=sample_chunk_ids,
             collection_name=config.COLLECTION_NAME,
         )
-
-        # Verify cleanup
         mock_rmtree.assert_called_once_with("/tmp/test_dir")
 
     @pytest.mark.asyncio
-    @patch("src.routes.documents_router._process_pdf_file")
+    @patch("src.routes.documents_router._blob_storage_process_pdf_file")
     @patch("src.routes.documents_router.ChromaStore")
     @patch("src.routes.documents_router.tempfile.mkdtemp")
     @patch("src.routes.documents_router.os.path.exists")
@@ -251,24 +236,21 @@ class TestDocumentsRouter:
         mock_exists,
         mock_mkdtemp,
         mock_chroma_store_class,
-        mock_process_pdf,
+        mock_blob_storage_process_pdf,
         test_client,
         mock_pdf_file,
         sample_chunks,
         sample_chunk_ids,
     ):
         """Test successful PDF document update"""
-        # Setup mocks
         mock_mkdtemp.return_value = "/tmp/test_dir"
         mock_exists.return_value = True
-        mock_process_pdf.return_value = (
+        mock_blob_storage_process_pdf.return_value = (
             sample_chunks,
             sample_chunk_ids,
-            "test_document.pdf",
             {"source": "test_document.pdf", "title": "Test Document"},
         )
 
-        # Setup ChromaStore mock
         mock_store = AsyncMock()
         mock_store.replace_documents.return_value = (2, 3, 1)
         mock_store.store_metadata = {
@@ -277,20 +259,12 @@ class TestDocumentsRouter:
         }
         mock_chroma_store_class.return_value = mock_store
 
-        # Use test client to call the endpoint
         with patch("fastapi.Depends", return_value=None):
             response = test_client.post(
                 "/v1/documents/pdf/update",
-                files={
-                    "pdf_file": (
-                        "test_document.pdf",
-                        b"test content",
-                        "application/pdf",
-                    )
-                },
+                json={"blob_name": "test_document.pdf"},
             )
 
-        # Verify response
         assert response.status_code == 200
         response_data = response.json()
         assert response_data["status"] == "success"
@@ -299,18 +273,15 @@ class TestDocumentsRouter:
         assert response_data["docs_replaced"] == 3
         assert response_data["sources_updated"] == 1
 
-        # Verify service calls
         mock_store.replace_documents.assert_called_once_with(
             documents=sample_chunks,
             ids=sample_chunk_ids,
             collection_name=config.COLLECTION_NAME,
         )
-
-        # Verify cleanup
         mock_rmtree.assert_called_once_with("/tmp/test_dir")
 
     @pytest.mark.asyncio
-    @patch("src.routes.documents_router._process_pdf_file")
+    @patch("src.routes.documents_router._blob_storage_process_pdf_file")
     @patch("src.routes.documents_router.ChromaStore")
     @patch("src.routes.documents_router.tempfile.mkdtemp")
     @patch("src.routes.documents_router.os.path.exists")
@@ -321,36 +292,26 @@ class TestDocumentsRouter:
         mock_exists,
         mock_mkdtemp,
         mock_chroma_store_class,
-        mock_process_pdf,
+        mock_blob_storage_process_pdf,
         test_client,
     ):
         """Test error handling in add_pdf_document"""
-        # Setup mocks
         mock_mkdtemp.return_value = "/tmp/test_dir"
         mock_exists.return_value = True
 
-        # Setup process_pdf to raise an exception
-        mock_process_pdf.side_effect = Exception("PDF processing failed")
+        mock_blob_storage_process_pdf.side_effect = Exception("PDF processing failed")
 
-        # Send request using test_client and assert exception is raised
-        with pytest.raises(Exception, match="PDF processing failed"):
-            with patch("fastapi.Depends", return_value=None):
-                test_client.post(
-                    "/v1/documents/pdf/add",
-                    files={
-                        "pdf_file": (
-                            "test_document.pdf",
-                            b"test content",
-                            "application/pdf",
-                        )
-                    },
-                )
-
-        # Verify cleanup still occurs - this is the key thing we're testing
+        with patch("fastapi.Depends", return_value=None):
+            response = test_client.post(
+                "/v1/documents/pdf/add",
+                json={"blob_name": "test_document.pdf"},
+            )
+        assert response.status_code == 503
+        assert "PDF processing failed" in response.json()["detail"]
         mock_rmtree.assert_called_once_with("/tmp/test_dir")
 
     @pytest.mark.asyncio
-    @patch("src.routes.documents_router._process_pdf_file")
+    @patch("src.routes.documents_router._blob_storage_process_pdf_file")
     @patch("src.routes.documents_router.ChromaStore")
     @patch("src.routes.documents_router.tempfile.mkdtemp")
     @patch("src.routes.documents_router.os.path.exists")
@@ -361,46 +322,35 @@ class TestDocumentsRouter:
         mock_exists,
         mock_mkdtemp,
         mock_chroma_store_class,
-        mock_process_pdf,
+        mock_blob_storage_process_pdf,
         test_client,
         sample_chunks,
         sample_chunk_ids,
     ):
         """Test error handling in update_pdf_document"""
-        # Setup mocks
         mock_mkdtemp.return_value = "/tmp/test_dir"
         mock_exists.return_value = True
-        mock_process_pdf.return_value = (
+        mock_blob_storage_process_pdf.return_value = (
             sample_chunks,
             sample_chunk_ids,
-            "test_document.pdf",
             {"source": "test_document.pdf", "title": "Test Document"},
         )
 
-        # Setup ChromaStore mock to raise an exception
         mock_store = AsyncMock()
         mock_store.replace_documents.side_effect = Exception("Vector store error")
         mock_chroma_store_class.return_value = mock_store
 
-        # Send request using test_client and assert exception is raised
-        with pytest.raises(Exception, match="Vector store error"):
-            with patch("fastapi.Depends", return_value=None):
-                test_client.post(
-                    "/v1/documents/pdf/update",
-                    files={
-                        "pdf_file": (
-                            "test_document.pdf",
-                            b"test content",
-                            "application/pdf",
-                        )
-                    },
-                )
-
-        # Verify cleanup still occurs - this is the key thing we're testing
+        with patch("fastapi.Depends", return_value=None):
+            response = test_client.post(
+                "/v1/documents/pdf/update",
+                json={"blob_name": "test_document.pdf"},
+            )
+        assert response.status_code == 503
+        assert "Vector store error" in response.json()["detail"]
         mock_rmtree.assert_called_once_with("/tmp/test_dir")
 
     @pytest.mark.asyncio
-    @patch("src.routes.documents_router._process_pdf_file")
+    @patch("src.routes.documents_router._blob_storage_process_pdf_file")
     @patch("src.routes.documents_router.ChromaStore")
     @patch("src.routes.documents_router.tempfile.mkdtemp")
     @patch("src.routes.documents_router.os.path.exists")
@@ -411,23 +361,20 @@ class TestDocumentsRouter:
         mock_exists,
         mock_mkdtemp,
         mock_chroma_store_class,
-        mock_process_pdf,
+        mock_blob_storage_process_pdf,
         test_client,
         sample_chunks,
         sample_chunk_ids,
     ):
         """Test PDF document addition with some chunks skipped"""
-        # Setup mocks
         mock_mkdtemp.return_value = "/tmp/test_dir"
         mock_exists.return_value = True
-        mock_process_pdf.return_value = (
+        mock_blob_storage_process_pdf.return_value = (
             sample_chunks,
             sample_chunk_ids,
-            "test_document.pdf",
             {"source": "test_document.pdf", "title": "Test Document"},
         )
 
-        # Setup ChromaStore mock for partial addition (some docs skipped)
         mock_store = AsyncMock()
         mock_store.add_documents.return_value = (1, 1, ["other_document.pdf"])
         mock_store.store_metadata = {
@@ -436,20 +383,12 @@ class TestDocumentsRouter:
         }
         mock_chroma_store_class.return_value = mock_store
 
-        # Use test client to call the endpoint
         with patch("fastapi.Depends", return_value=None):
             response = test_client.post(
                 "/v1/documents/pdf/add",
-                files={
-                    "pdf_file": (
-                        "test_document.pdf",
-                        b"test content",
-                        "application/pdf",
-                    )
-                },
+                json={"blob_name": "test_document.pdf"},
             )
 
-        # Verify response
         assert response.status_code == 200
         response_data = response.json()
         assert response_data["status"] == "success"
