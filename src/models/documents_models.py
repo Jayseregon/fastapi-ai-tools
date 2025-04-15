@@ -3,7 +3,6 @@ from typing import Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
-# TODO: remove after testing
 class DocumentMetadata(BaseModel):
     id: Optional[str] = None
     producer: Optional[str] = None

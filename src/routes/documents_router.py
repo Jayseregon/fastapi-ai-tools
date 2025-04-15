@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import shutil
@@ -67,7 +68,6 @@ async def _process_pdf_file(
     cleaner = PdfDocumentCleaner()
     cleaned_docs = await cleaner.clean_documents(documents=raw_docs)
 
-    # TODO : remove after testing
     doc_metadata_abstract: DocumentMetadata = cleaned_docs[0].metadata
 
     # Process the cleaned documents to create chunks and ids
@@ -115,7 +115,6 @@ async def _process_web_url(
     cleaner = WebDocumentCleaner()
     cleaned_docs = await cleaner.clean_documents(documents=raw_docs)
 
-    # TODO : remove after testing
     doc_metadata_abstract: DocumentMetadata = cleaned_docs[0].metadata
 
     # Process the cleaned documents to create chunks and ids
@@ -179,6 +178,10 @@ async def add_pdf_document(
             doc_sample_meta=doc_metadata_abstract,
         )
 
+    except Exception as e:
+        logger.error(f"Error loading pdf file: {str(e)}")
+        raise HTTPException(status_code=503, detail=f"Error loading pdf file: {str(e)}")
+
     finally:
         if os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
@@ -238,6 +241,11 @@ async def update_pdf_document(
             sources_updated=sources_updated,
             doc_sample_meta=doc_metadata_abstract,
         )
+
+    except Exception as e:
+        logger.error(f"Error loading pdf file: {str(e)}")
+        raise HTTPException(status_code=503, detail=f"Error loading pdf file: {str(e)}")
+
     finally:
         if os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
@@ -357,3 +365,60 @@ async def update_web_document(
     except Exception as e:
         logger.error(f"Error loading web url: {str(e)}")
         raise HTTPException(status_code=503, detail=f"Error loading web url: {str(e)}")
+
+
+@router.post("/setics/add", response_model=AddDocumentsResponse, status_code=200)
+async def add_setics_document(
+    json_file: UploadFile,
+    is_image: Optional[bool] = False,
+    rate: Optional[None] = Depends(RateLimiter(times=3, seconds=10)),
+) -> AddDocumentsResponse:
+    try:
+        logger.debug(f"json_file: {json_file}")
+        logger.debug(f"type: {type(json_file)}")
+        json_content = await json_file.read()
+        json_data = json.loads(json_content.decode("utf-8"))
+
+        logger.debug(f"json_data: {json_data}")
+        logger.debug(f"type: {type(json_data)}")
+
+        clean_docs = [
+            Document(page_content=page["page_content"], metadata=page["metadata"])
+            for page in json_data
+        ]
+
+        doc_metadata_abstract: DocumentMetadata = clean_docs[0].metadata
+
+        if not is_image:
+            processor = DocumentsPreprocessing()
+            chunks, ids = await processor(documents=clean_docs)
+        else:
+            chunks = clean_docs
+            ids = [doc.metadata["id"] for doc in clean_docs]
+
+        store = ChromaStore()
+        added_count, skipped_count, skipped_sources = await store.add_documents(
+            documents=chunks,
+            ids=ids,
+            collection_name=config.COLLECTION_NAME,
+            skip_existing=False,
+            is_web=True,
+        )
+
+        original_filename = cast(str, json_file.filename or "unnamed_document.json")
+
+        return AddDocumentsResponse(
+            status="success",
+            filename=original_filename,
+            store_metadata=StoreMetadata.model_validate(store.store_metadata),
+            added_count=added_count,
+            skipped_count=skipped_count,
+            skipped_sources=skipped_sources,
+            doc_sample_meta=doc_metadata_abstract,
+        )
+
+    except Exception as e:
+        logger.error(f"Error loading json data: {str(e)}")
+        raise HTTPException(
+            status_code=503, detail=f"Error loading json data: {str(e)}"
+        )
