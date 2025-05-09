@@ -102,6 +102,26 @@ def sample_ids():
     return ["id1", "id2", "id3", "id4"]
 
 
+@pytest.fixture
+def mock_mixed_collection():
+    """Mock ChromaDB collection with mixed sources (web URLs and files)"""
+    collection = MagicMock()
+    collection.name = "mixed_collection"
+    collection.count.return_value = 5
+
+    collection.get.return_value = {
+        "ids": ["id1", "id2", "id3", "id4", "id5"],
+        "metadatas": [
+            {"source": "/path/to/doc1.pdf"},
+            {"source": "https://example.com/page1"},
+            {"source": "/path/to/doc2.docx"},
+            {"source": "http://example.org/page2"},
+            {"source": "/path/to/doc3.txt"},
+        ],
+    }
+    return collection
+
+
 class TestChromaStore:
 
     @patch("src.services.vectorstore.chroma_store.chroma_service")
@@ -494,3 +514,174 @@ class TestChromaStore:
         mock_store_instance.get_retriever.assert_called_once_with(
             "custom_collection", 7
         )
+
+    @patch("src.services.vectorstore.chroma_store.chroma_service")
+    @patch("src.services.vectorstore.chroma_store.OpenAIEmbeddings")
+    def test_is_web_source(self, mock_embeddings, mock_chroma_service, mock_client):
+        """Test the _is_web_source method for correctly identifying web URLs"""
+        mock_chroma_service.return_value = mock_client
+        mock_embeddings.return_value = MagicMock()
+
+        store = ChromaStore()
+
+        # Test web URLs
+        assert store._is_web_source("http://example.com") is True
+        assert store._is_web_source("https://example.com/page.html") is True
+
+        # Test file paths
+        assert store._is_web_source("/path/to/file.pdf") is False
+        assert store._is_web_source("file.txt") is False
+        assert store._is_web_source("C:\\Windows\\file.docx") is False
+
+        # Test edge cases
+        assert (
+            store._is_web_source("httpfile.pdf") is False
+        )  # Not a URL, just contains 'http'
+        assert store._is_web_source("") is False
+
+    @pytest.mark.asyncio
+    @patch("src.services.vectorstore.chroma_store.chroma_service")
+    @patch("src.services.vectorstore.chroma_store.OpenAIEmbeddings")
+    async def test_get_source_tracker_auto(
+        self, mock_embeddings, mock_chroma_service, mock_client, mock_mixed_collection
+    ):
+        """Test source tracker with automatic web/file detection"""
+        mock_chroma_service.return_value = mock_client
+        mock_client.get_or_create_collection.return_value = mock_mixed_collection
+        mock_embeddings.return_value = MagicMock()
+
+        store = ChromaStore()
+        sources = await store._get_source_tracker_auto("mixed_collection")
+
+        assert isinstance(sources, set)
+        assert len(sources) == 5
+        # File sources should be just filenames
+        assert "doc1.pdf" in sources
+        assert "doc2.docx" in sources
+        assert "doc3.txt" in sources
+        # Web sources should be complete URLs
+        assert "https://example.com/page1" in sources
+        assert "http://example.org/page2" in sources
+
+    @pytest.mark.asyncio
+    @patch("src.services.vectorstore.chroma_store.chroma_service")
+    @patch("src.services.vectorstore.chroma_store.OpenAIEmbeddings")
+    async def test_get_collections_with_sources(
+        self, mock_embeddings, mock_chroma_service, mock_client
+    ):
+        """Test getting collections with their sources"""
+        mock_chroma_service.return_value = mock_client
+        mock_client.list_collections.return_value = ["collection1", "collection2"]
+        mock_embeddings.return_value = MagicMock()
+
+        # Create a store with mocked _get_source_tracker_auto method
+        store = ChromaStore()
+        store._get_source_tracker_auto = AsyncMock()
+        # Configure the mock to return different sources for each collection
+        store._get_source_tracker_auto.side_effect = [
+            {"doc1.pdf", "doc2.pdf", "https://example.com/page1"},
+            {"doc3.pdf", "http://test.org/page2"},
+        ]
+
+        result = await store.get_collections_with_sources()
+
+        assert isinstance(result, dict)
+        assert len(result) == 2
+        assert "collection1" in result
+        assert "collection2" in result
+        # Check that the sources are sorted lists
+        assert result["collection1"] == [
+            "doc1.pdf",
+            "doc2.pdf",
+            "https://example.com/page1",
+        ]
+        assert result["collection2"] == ["doc3.pdf", "http://test.org/page2"]
+        # Verify that _get_source_tracker_auto was called for each collection
+        assert store._get_source_tracker_auto.call_count == 2
+        store._get_source_tracker_auto.assert_any_call("collection1")
+        store._get_source_tracker_auto.assert_any_call("collection2")
+
+    @pytest.mark.asyncio
+    @patch("src.services.vectorstore.chroma_store.chroma_service")
+    @patch("src.services.vectorstore.chroma_store.OpenAIEmbeddings")
+    async def test_delete_source_documents_file(
+        self, mock_embeddings, mock_chroma_service, mock_client, mock_collection
+    ):
+        """Test deleting documents from a file source"""
+        mock_chroma_service.return_value = mock_client
+        mock_client.get_or_create_collection.return_value = mock_collection
+        mock_embeddings.return_value = MagicMock()
+
+        store = ChromaStore()
+        docs_deleted = await store.delete_source_documents(
+            "test_collection", "doc1.pdf"
+        )
+
+        # Should have deleted 1 document
+        assert docs_deleted == 1
+        # Verify the collection's delete method was called with the correct ID
+        mock_collection.delete.assert_called_once_with(ids=["id1"])
+
+    @pytest.mark.asyncio
+    @patch("src.services.vectorstore.chroma_store.chroma_service")
+    @patch("src.services.vectorstore.chroma_store.OpenAIEmbeddings")
+    async def test_delete_source_documents_web_url(
+        self, mock_embeddings, mock_chroma_service, mock_client, mock_mixed_collection
+    ):
+        """Test deleting documents from a web URL source"""
+        mock_chroma_service.return_value = mock_client
+        mock_client.get_or_create_collection.return_value = mock_mixed_collection
+        mock_embeddings.return_value = MagicMock()
+
+        store = ChromaStore()
+        docs_deleted = await store.delete_source_documents(
+            "mixed_collection", "https://example.com/page1"
+        )
+
+        # Should have deleted 1 document
+        assert docs_deleted == 1
+        # Verify the collection's delete method was called with the correct ID
+        mock_collection = mock_client.get_or_create_collection.return_value
+        mock_collection.delete.assert_called_once_with(ids=["id2"])
+
+    @pytest.mark.asyncio
+    @patch("src.services.vectorstore.chroma_store.chroma_service")
+    @patch("src.services.vectorstore.chroma_store.OpenAIEmbeddings")
+    async def test_delete_source_documents_not_found(
+        self, mock_embeddings, mock_chroma_service, mock_client, mock_collection
+    ):
+        """Test deleting documents when source not found"""
+        mock_chroma_service.return_value = mock_client
+        mock_client.get_or_create_collection.return_value = mock_collection
+        mock_embeddings.return_value = MagicMock()
+
+        store = ChromaStore()
+        docs_deleted = await store.delete_source_documents(
+            "test_collection", "nonexistent.pdf"
+        )
+
+        # Should have deleted 0 documents
+        assert docs_deleted == 0
+        # Verify the collection's delete method was not called
+        mock_collection.delete.assert_not_called()
+
+    @pytest.mark.asyncio
+    @patch("src.services.vectorstore.chroma_store.chroma_service")
+    @patch("src.services.vectorstore.chroma_store.OpenAIEmbeddings")
+    async def test_delete_source_documents_empty_collection(
+        self, mock_embeddings, mock_chroma_service, mock_client, mock_empty_collection
+    ):
+        """Test deleting documents from an empty collection"""
+        mock_chroma_service.return_value = mock_client
+        mock_client.get_or_create_collection.return_value = mock_empty_collection
+        mock_embeddings.return_value = MagicMock()
+
+        store = ChromaStore()
+        docs_deleted = await store.delete_source_documents(
+            "empty_collection", "doc1.pdf"
+        )
+
+        # Should have deleted 0 documents
+        assert docs_deleted == 0
+        # Verify the collection's delete method was not called
+        mock_empty_collection.delete.assert_not_called()

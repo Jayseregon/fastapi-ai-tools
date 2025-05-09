@@ -16,6 +16,8 @@ from src.models.neo4j_infos_models import (
     QueryParameters,
     QueryResponse,
 )
+from src.models.user import User
+from src.security.jwt_auth import validate_token
 from src.security.rateLimiter.depends import RateLimiter
 from src.services.db import neo4j_service
 
@@ -28,7 +30,8 @@ router = APIRouter(prefix="/v1/neo4j-infos", tags=["Neo4j"])
 
 @router.get("/ping", response_model=Neo4jStatus)
 async def test_neo4j(
-    rate: Optional[None] = Depends(RateLimiter(times=3, seconds=10))
+    current_user: User = Depends(validate_token),
+    rate: Optional[None] = Depends(RateLimiter(times=3, seconds=10)),
 ) -> Neo4jStatus:
     """Test connectivity to the Neo4j graph database.
 
@@ -61,7 +64,8 @@ async def test_neo4j(
 
 @router.get("/fake/populate", response_model=PopulationResult)
 async def populate_neo4j(
-    rate: Optional[None] = Depends(RateLimiter(times=3, seconds=10))
+    current_user: User = Depends(validate_token),
+    rate: Optional[None] = Depends(RateLimiter(times=3, seconds=10)),
 ) -> PopulationResult:
     """Populate Neo4j with fake data (people, companies, and relationships).
 
@@ -165,6 +169,7 @@ async def query_neo4j(
     company: Optional[str] = Query(None, description="Company name for filtering"),
     person: Optional[str] = Query(None, description="Person name for filtering"),
     limit: int = Query(10, description="Max number of results to return"),
+    current_user: User = Depends(validate_token),
     rate: Optional[None] = Depends(RateLimiter(times=3, seconds=10)),
 ) -> Union[QueryResponse, ErrorResponse]:
     """Query Neo4j database with different query types.

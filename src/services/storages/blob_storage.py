@@ -68,7 +68,8 @@ class BlobStorage(BaseStorage):
             )
             logger.debug(f"blob_client: {blob_client}")
 
-            temp_pdf_path: Path = temp_dir / blob_name
+            # Remove the timestamp from the blob name
+            temp_pdf_path: Path = temp_dir / blob_name.split("/")[-1]
 
             with temp_pdf_path.open("wb") as download_file:
                 logger.debug(f"Downloading blob to {temp_pdf_path}")

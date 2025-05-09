@@ -24,7 +24,8 @@ services:
       - fastapi-network
 
   fastapi-chromadb:
-    image: chromadb/chroma
+    # image: chromadb/chroma
+    image: chromadb/chroma:1.0.6.dev6
     container_name: fastapi-chromadb
     environment:
       - CHROMA_SERVER_AUTHN_CREDENTIALS=admin:$$2y$$05$$K4zk4e9Ep8T6nfnKilxD5euOa6speUJxyegGm21/Y34h5EjOOpNwa
@@ -32,11 +33,10 @@ services:
       - CHROMA_SERVER_HOST=0.0.0.0
       - CHROMA_SERVER_PORT=8000
       - IS_PERSISTENT=TRUE
-      - PERSIST_DIRECTORY=/chroma/chroma
     ports:
       - 8000:8000
     volumes:
-      - chroma_data:/chroma/chroma
+      - chroma_data:/data
     restart: always
     networks:
       - fastapi-network
@@ -47,4 +47,3 @@ volumes:
 
 networks:
   fastapi-network:
-    driver: bridge

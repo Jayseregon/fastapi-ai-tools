@@ -80,7 +80,7 @@ def mock_auth_validator():
             email="test@example.com",
             name="Test User",
             roles=["user"],
-            issuer="testissuer",  # Add missing fields
+            issuer="testissuer",
             issued_at=1678886400,
             expires_at=1678890000,
         )

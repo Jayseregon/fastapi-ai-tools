@@ -4,9 +4,9 @@ import os
 import shutil
 import tempfile
 from pathlib import Path
-from typing import List, Optional, Tuple, cast
+from typing import List, Optional, Tuple
 
-from fastapi import APIRouter, Body, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Body, Depends, HTTPException
 from langchain.schema import Document
 
 from src.configs.env_config import config
@@ -17,6 +17,8 @@ from src.models.documents_models import (
     UpdateDocumentsResponse,
     WebUrlRequest,
 )
+from src.models.user import User
+from src.security.jwt_auth import validate_token
 from src.security.rateLimiter.depends import RateLimiter
 from src.services.cleaners import PdfDocumentCleaner, WebDocumentCleaner
 from src.services.loaders.files import PdfLoader
@@ -120,11 +122,65 @@ async def _process_web_url(
     return chunks, ids, request.web_url, doc_metadata_abstract
 
 
+async def _blob_storage_process_setics_file(
+    blob_name: str,
+    temp_dir: str | Path,
+    is_image: bool = False,
+) -> Tuple[List[Document], List[str], DocumentMetadata]:
+    """
+    Process a Setics JSON file stored in Azure Blob Storage.
+
+    Downloads the blob, loads and processes the document.
+
+    Args:
+        blob_name (str): The name of the blob in Azure Blob Storage.
+        temp_dir (str | Path): The directory to save the downloaded blob.
+        is_image (bool): Whether the document contains image data.
+
+    Returns:
+        Tuple[List[Document], List[str], DocumentMetadata]:
+            - chunks: List of processed Document objects.
+            - ids: List of unique identifiers for each document chunk.
+            - doc_metadata_abstract: Metadata extracted from the first document.
+    """
+    async with BlobStorage() as storage:
+        temp_json_path = await storage.download_blob(
+            blob_name=blob_name,
+            temp_dir=temp_dir,
+        )
+
+    # Read and parse the JSON file
+    with open(temp_json_path, "r") as file:
+        json_data = json.load(file)
+
+    clean_docs = [
+        Document(page_content=page["page_content"], metadata=page["metadata"])
+        for page in json_data
+    ]
+
+    # Update document_type field in metadata
+    for doc in clean_docs:
+        doc.metadata["document_type"] = "web_setics"
+
+    # Extract metadata info for response object
+    doc_metadata_abstract: DocumentMetadata = clean_docs[0].metadata
+
+    if not is_image:
+        processor = DocumentsPreprocessing()
+        chunks, ids = await processor(documents=clean_docs)
+    else:
+        chunks = clean_docs
+        ids = [doc.metadata["id"] for doc in clean_docs]
+
+    return chunks, ids, doc_metadata_abstract
+
+
 @router.post("/pdf/add", response_model=AddDocumentsResponse, status_code=200)
 async def add_pdf_document(
     blob_name: str = Body(
         ..., embed=True, description="Blob name in Azure Blob Storage"
     ),
+    current_user: User = Depends(validate_token),
     rate: Optional[None] = Depends(RateLimiter(times=3, seconds=10)),
 ) -> AddDocumentsResponse:
     """
@@ -191,6 +247,7 @@ async def update_pdf_document(
     blob_name: str = Body(
         ..., embed=True, description="Blob name in Azure Blob Storage"
     ),
+    current_user: User = Depends(validate_token),
     rate: Optional[None] = Depends(RateLimiter(times=3, seconds=10)),
 ) -> UpdateDocumentsResponse:
     """
@@ -256,6 +313,7 @@ async def update_pdf_document(
 @router.post("/web/add", response_model=AddDocumentsResponse, status_code=200)
 async def add_web_document(
     request: WebUrlRequest,
+    current_user: User = Depends(validate_token),
     rate: Optional[None] = Depends(RateLimiter(times=3, seconds=10)),
 ) -> AddDocumentsResponse:
     """Add a new web page to the vector store.
@@ -314,6 +372,7 @@ async def add_web_document(
 @router.post("/web/update", response_model=UpdateDocumentsResponse, status_code=200)
 async def update_web_document(
     request: WebUrlRequest,
+    current_user: User = Depends(validate_token),
     rate: Optional[None] = Depends(RateLimiter(times=3, seconds=10)),
 ) -> UpdateDocumentsResponse:
     """Update an existing web page in the vector store.
@@ -370,48 +429,50 @@ async def update_web_document(
 
 
 @router.post("/setics/add", response_model=AddDocumentsResponse, status_code=200)
-async def add_setics_document(
-    json_file: UploadFile,
-    is_image: Optional[bool] = False,
+async def add_setics_documents(
+    blob_name: str = Body(
+        ..., embed=True, description="Blob name in Azure Blob Storage"
+    ),
+    is_image: bool = Body(
+        False, embed=True, description="Whether the document contains image data"
+    ),
+    current_user: User = Depends(validate_token),
     rate: Optional[None] = Depends(RateLimiter(times=3, seconds=10)),
 ) -> AddDocumentsResponse:
+    """
+    Add Setics documents from Azure Blob Storage to the vector store.
+
+    Args:
+        blob_name (str): The name of the blob in Azure Blob Storage.
+        is_image (bool): Whether the document contains image data.
+        rate (Optional[None]): Rate limiter dependency.
+
+    Returns:
+        AddDocumentsResponse: Details about the operation.
+    """
+    temp_dir = tempfile.mkdtemp()
+
     try:
-        logger.debug(f"json_file: {json_file}")
-        logger.debug(f"type: {type(json_file)}")
-        json_content = await json_file.read()
-        json_data = json.loads(json_content.decode("utf-8"))
+        # Process the Setics JSON file from Azure Blob Storage
+        chunks, ids, doc_metadata_abstract = await _blob_storage_process_setics_file(
+            blob_name=blob_name,
+            temp_dir=temp_dir,
+            is_image=is_image,
+        )
 
-        logger.debug(f"json_data: {json_data}")
-        logger.debug(f"type: {type(json_data)}")
-
-        clean_docs = [
-            Document(page_content=page["page_content"], metadata=page["metadata"])
-            for page in json_data
-        ]
-
-        doc_metadata_abstract: DocumentMetadata = clean_docs[0].metadata
-
-        if not is_image:
-            processor = DocumentsPreprocessing()
-            chunks, ids = await processor(documents=clean_docs)
-        else:
-            chunks = clean_docs
-            ids = [doc.metadata["id"] for doc in clean_docs]
-
+        # Add setics documents to the vector store
         store = ChromaStore()
         added_count, skipped_count, skipped_sources = await store.add_documents(
             documents=chunks,
             ids=ids,
-            collection_name=config.COLLECTION_NAME,
+            collection_name=config.SETICS_COLLECTION,
             skip_existing=False,
             is_web=True,
         )
 
-        original_filename = cast(str, json_file.filename or "unnamed_document.json")
-
         return AddDocumentsResponse(
             status="success",
-            filename=original_filename,
+            filename=blob_name,
             store_metadata=StoreMetadata.model_validate(store.store_metadata),
             added_count=added_count,
             skipped_count=skipped_count,
@@ -420,7 +481,71 @@ async def add_setics_document(
         )
 
     except Exception as e:
-        logger.error(f"Error loading json data: {str(e)}")
+        logger.error(f"Error loading Setics data: {str(e)}")
         raise HTTPException(
-            status_code=503, detail=f"Error loading json data: {str(e)}"
+            status_code=503, detail=f"Error loading Setics data: {str(e)}"
         )
+    finally:
+        if os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)
+
+
+@router.post("/setics/update", response_model=UpdateDocumentsResponse, status_code=200)
+async def update_setics_documents(
+    blob_name: str = Body(
+        ..., embed=True, description="Blob name in Azure Blob Storage"
+    ),
+    is_image: bool = Body(
+        False, embed=True, description="Whether the document contains image data"
+    ),
+    current_user: User = Depends(validate_token),
+    rate: Optional[None] = Depends(RateLimiter(times=3, seconds=10)),
+) -> UpdateDocumentsResponse:
+    """
+    Update Setics documents in the vector store from Azure Blob Storage.
+
+    Args:
+        blob_name (str): The name of the blob in Azure Blob Storage.
+        is_image (bool): Whether the document contains image data.
+        rate (Optional[None]): Rate limiter dependency.
+
+    Returns:
+        UpdateDocumentsResponse: Details about the operation.
+    """
+    temp_dir = tempfile.mkdtemp()
+
+    try:
+        # Process the Setics JSON file from Azure Blob Storage
+        chunks, ids, doc_metadata_abstract = await _blob_storage_process_setics_file(
+            blob_name=blob_name,
+            temp_dir=temp_dir,
+            is_image=is_image,
+        )
+
+        # Update setics documents in the vector store
+        store = ChromaStore()
+        added_count, docs_replaced, sources_updated = await store.replace_documents(
+            documents=chunks,
+            ids=ids,
+            collection_name=config.SETICS_COLLECTION,
+            is_web=True,
+        )
+
+        return UpdateDocumentsResponse(
+            status="success",
+            filename=blob_name,
+            store_metadata=StoreMetadata.model_validate(store.store_metadata),
+            added_count=added_count,
+            docs_replaced=docs_replaced,
+            sources_updated=sources_updated,
+            doc_sample_meta=doc_metadata_abstract,
+        )
+
+    except Exception as e:
+        logger.error(f"Error loading Setics data: {str(e)}")
+        raise HTTPException(
+            status_code=503, detail=f"Error loading Setics data: {str(e)}"
+        )
+    finally:
+        if os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)

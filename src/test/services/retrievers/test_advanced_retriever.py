@@ -70,7 +70,9 @@ class TestMultiQRerankedRetriever:
 
         # Check that all the components were created correctly
         mock_chroma_retriever.assert_called_once_with(collection_name="test_collection")
-        mock_flashrank_rerank.assert_called_once_with(top_n=5)
+        mock_flashrank_rerank.assert_called_once_with(
+            model="ms-marco-MiniLM-L-12-v2", top_n=5
+        )
         mock_multi_query_retriever.from_llm.assert_called_once_with(
             retriever=mock_base_retriever,
             llm=retriever.llm,
@@ -155,7 +157,9 @@ class TestMultiQRerankedRetriever:
         assert len(results) == 3
 
         mock_chroma_retriever.assert_called_once_with(collection_name="test_collection")
-        mock_flashrank_rerank.assert_called_once_with(top_n=3)
+        mock_flashrank_rerank.assert_called_once_with(
+            model="ms-marco-MiniLM-L-12-v2", top_n=3
+        )
         mock_multi_query_retriever.from_llm.assert_called_once()
         mock_contextual_compression_retriever.assert_called_once()
         mock_contextual_instance.ainvoke.assert_called_once_with("complex query")

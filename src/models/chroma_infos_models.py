@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, List
 
 from pydantic import BaseModel, Field, RootModel
 
@@ -18,7 +18,35 @@ class CollectionsResponse(RootModel):
         ..., description="Dictionary mapping collection names to their document counts"
     )
 
-    # Define a model_config to provide schema information
-    model_config = {
-        "json_schema_extra": {"examples": [{"collection1": 10, "collection2": 25}]}
-    }
+
+class DeleteCollectionRequest(BaseModel):
+    collection_name: str = Field(..., description="Name of the collection to delete")
+
+
+class DeleteCollectionResponse(BaseModel):
+    status: str = Field(..., description="Result status, e.g., 'success' or 'error'")
+    message: str = Field(..., description="Descriptive message about the operation")
+
+
+class CollectionSourcesResponse(BaseModel):
+    """Response model for collections and their document sources"""
+
+    collections: Dict[str, List[str]] = Field(
+        ...,
+        description="Dictionary mapping collection names to lists of their unique document sources",
+    )
+
+
+class DeleteSourceRequest(BaseModel):
+    collection_name: str = Field(
+        ..., description="Name of the collection containing the source"
+    )
+    source_name: str = Field(
+        ..., description="Name of the source to delete (filename or full URL)"
+    )
+
+
+class DeleteSourceResponse(BaseModel):
+    status: str = Field(..., description="Result status, e.g., 'success' or 'error'")
+    message: str = Field(..., description="Descriptive message about the operation")
+    documents_deleted: int = Field(..., description="Number of documents deleted")

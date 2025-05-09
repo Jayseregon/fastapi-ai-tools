@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, mock_open, patch
 
 import pytest
 from fastapi import FastAPI
@@ -102,6 +102,56 @@ def sample_web_request_with_images():
     return WebUrlRequest(web_url="https://example.com/page", with_images=True)
 
 
+@pytest.fixture
+def sample_setics_json():
+    """Create sample Setics JSON data for testing"""
+    return [
+        {
+            "page_content": "This is a Setics document",
+            "metadata": {
+                "source": "setics_document.json",
+                "title": "Setics Test Document",
+                "id": "setics-doc-12345",
+                "url": "https://example.com/setics-doc",
+            },
+        },
+        {
+            "page_content": "This is another page of the Setics document",
+            "metadata": {
+                "source": "setics_document.json",
+                "title": "Setics Test Document Page 2",
+                "id": "setics-doc-67890",
+                "url": "https://example.com/setics-doc/page2",
+            },
+        },
+    ]
+
+
+@pytest.fixture
+def sample_setics_documents():
+    """Create sample Setics document objects for testing"""
+    return [
+        Document(
+            page_content="This is a Setics document",
+            metadata={
+                "source": "setics_document.json",
+                "title": "Setics Test Document",
+                "id": "setics-doc-12345",
+                "url": "https://example.com/setics-doc",
+            },
+        ),
+        Document(
+            page_content="This is another page of the Setics document",
+            metadata={
+                "source": "setics_document.json",
+                "title": "Setics Test Document Page 2",
+                "id": "setics-doc-67890",
+                "url": "https://example.com/setics-doc/page2",
+            },
+        ),
+    ]
+
+
 class TestDocumentsRouter:
     @pytest.mark.asyncio
     @patch("src.routes.documents_router.BlobStorage")
@@ -118,6 +168,7 @@ class TestDocumentsRouter:
         sample_document,
         sample_chunks,
         sample_chunk_ids,
+        auth_headers,
     ):
         """Test the internal _blob_storage_process_pdf_file function"""
         from src.routes.documents_router import _blob_storage_process_pdf_file
@@ -186,6 +237,7 @@ class TestDocumentsRouter:
         mock_pdf_file,
         sample_chunks,
         sample_chunk_ids,
+        auth_headers,
     ):
         """Test successful PDF document addition"""
         mock_mkdtemp.return_value = "/tmp/test_dir"
@@ -208,6 +260,7 @@ class TestDocumentsRouter:
             response = test_client.post(
                 "/v1/documents/pdf/add",
                 json={"blob_name": "test_document.pdf"},
+                headers=auth_headers,
             )
 
         assert response.status_code == 200
@@ -241,6 +294,7 @@ class TestDocumentsRouter:
         mock_pdf_file,
         sample_chunks,
         sample_chunk_ids,
+        auth_headers,
     ):
         """Test successful PDF document update"""
         mock_mkdtemp.return_value = "/tmp/test_dir"
@@ -263,6 +317,7 @@ class TestDocumentsRouter:
             response = test_client.post(
                 "/v1/documents/pdf/update",
                 json={"blob_name": "test_document.pdf"},
+                headers=auth_headers,
             )
 
         assert response.status_code == 200
@@ -294,6 +349,7 @@ class TestDocumentsRouter:
         mock_chroma_store_class,
         mock_blob_storage_process_pdf,
         test_client,
+        auth_headers,
     ):
         """Test error handling in add_pdf_document"""
         mock_mkdtemp.return_value = "/tmp/test_dir"
@@ -305,6 +361,7 @@ class TestDocumentsRouter:
             response = test_client.post(
                 "/v1/documents/pdf/add",
                 json={"blob_name": "test_document.pdf"},
+                headers=auth_headers,
             )
         assert response.status_code == 503
         assert "PDF processing failed" in response.json()["detail"]
@@ -326,6 +383,7 @@ class TestDocumentsRouter:
         test_client,
         sample_chunks,
         sample_chunk_ids,
+        auth_headers,
     ):
         """Test error handling in update_pdf_document"""
         mock_mkdtemp.return_value = "/tmp/test_dir"
@@ -344,6 +402,7 @@ class TestDocumentsRouter:
             response = test_client.post(
                 "/v1/documents/pdf/update",
                 json={"blob_name": "test_document.pdf"},
+                headers=auth_headers,
             )
         assert response.status_code == 503
         assert "Vector store error" in response.json()["detail"]
@@ -365,6 +424,7 @@ class TestDocumentsRouter:
         test_client,
         sample_chunks,
         sample_chunk_ids,
+        auth_headers,
     ):
         """Test PDF document addition with some chunks skipped"""
         mock_mkdtemp.return_value = "/tmp/test_dir"
@@ -387,6 +447,7 @@ class TestDocumentsRouter:
             response = test_client.post(
                 "/v1/documents/pdf/add",
                 json={"blob_name": "test_document.pdf"},
+                headers=auth_headers,
             )
 
         assert response.status_code == 200
@@ -525,6 +586,7 @@ class TestDocumentsRouter:
         sample_chunks,
         sample_chunk_ids,
         sample_web_request,
+        auth_headers,
     ):
         """Test successful web document addition"""
         # Setup mocks
@@ -550,6 +612,7 @@ class TestDocumentsRouter:
             response = test_client.post(
                 "/v1/documents/web/add",
                 json={"web_url": "https://example.com/page", "with_images": False},
+                headers=auth_headers,
             )
 
         # Verify response
@@ -579,6 +642,7 @@ class TestDocumentsRouter:
         sample_chunks,
         sample_chunk_ids,
         sample_web_request,
+        auth_headers,
     ):
         """Test successful web document update"""
         # Setup mocks
@@ -604,6 +668,7 @@ class TestDocumentsRouter:
             response = test_client.post(
                 "/v1/documents/web/update",
                 json={"web_url": "https://example.com/page", "with_images": False},
+                headers=auth_headers,
             )
 
         # Verify response
@@ -627,7 +692,7 @@ class TestDocumentsRouter:
     @patch("src.routes.documents_router._process_web_url")
     @patch("src.routes.documents_router.ChromaStore")
     async def test_add_web_document_error_handling(
-        self, mock_chroma_store_class, mock_process_web, test_client
+        self, mock_chroma_store_class, mock_process_web, test_client, auth_headers
     ):
         """Test error handling in add_web_document"""
         # Setup process_web to raise an exception
@@ -637,7 +702,9 @@ class TestDocumentsRouter:
         with patch("fastapi.Depends", return_value=None):
             # Need to pass json data for the WebUrlRequest
             response = test_client.post(
-                "/v1/documents/web/add", json={"web_url": "https://example.com/page"}
+                "/v1/documents/web/add",
+                json={"web_url": "https://example.com/page"},
+                headers=auth_headers,
             )
 
         # Verify response indicates failure
@@ -654,6 +721,7 @@ class TestDocumentsRouter:
         test_client,
         sample_chunks,
         sample_chunk_ids,
+        auth_headers,
     ):
         """Test error handling in update_web_document"""
         # Setup mocks
@@ -673,9 +741,277 @@ class TestDocumentsRouter:
         with patch("fastapi.Depends", return_value=None):
             # Need to pass json data for the WebUrlRequest
             response = test_client.post(
-                "/v1/documents/web/update", json={"web_url": "https://example.com/page"}
+                "/v1/documents/web/update",
+                json={"web_url": "https://example.com/page"},
+                headers=auth_headers,
             )
 
         # Verify response indicates failure
         assert response.status_code == 503
         assert "Vector store error" in response.json()["detail"]
+
+    @pytest.mark.asyncio
+    @patch("src.routes.documents_router.BlobStorage")
+    @patch("src.routes.documents_router.json.load")
+    @patch("src.routes.documents_router.DocumentsPreprocessing")
+    async def test_blob_storage_process_setics_file(
+        self,
+        mock_processor_class,
+        mock_json_load,
+        mock_blob_storage_class,
+        sample_setics_json,
+        sample_setics_documents,
+        sample_chunks,
+        sample_chunk_ids,
+    ):
+        """Test the internal _blob_storage_process_setics_file function"""
+        from src.routes.documents_router import _blob_storage_process_setics_file
+
+        # Setup BlobStorage mock
+        mock_blob_storage = AsyncMock()
+        mock_blob_storage.__aenter__.return_value = mock_blob_storage
+        mock_blob_storage.download_blob.return_value = (
+            "/tmp/test_dir/setics_document.json"
+        )
+        mock_blob_storage_class.return_value = mock_blob_storage
+
+        # Setup JSON loading mock
+        mock_json_load.return_value = sample_setics_json
+
+        # Setup processor mock
+        mock_processor = AsyncMock()
+        mock_processor.return_value = (sample_chunks, sample_chunk_ids)
+        mock_processor_class.return_value = mock_processor
+
+        # Mock open function
+        with patch("builtins.open", mock_open()) as _:
+            # Test with is_image=False (default)
+            result = await _blob_storage_process_setics_file(
+                "setics_document.json", "/tmp/test_dir"
+            )
+
+        # Verify results
+        chunks, ids, metadata = result
+        assert chunks == sample_chunks
+        assert ids == sample_chunk_ids
+
+        # Check metadata fields individually, ignoring document_type which is added by the function
+        for key in sample_setics_documents[0].metadata:
+            assert metadata[key] == sample_setics_documents[0].metadata[key]
+        # Verify document_type is present with expected value
+        assert metadata["document_type"] == "web_setics"
+
+        # Verify BlobStorage download called
+        mock_blob_storage.download_blob.assert_called_once_with(
+            blob_name="setics_document.json",
+            temp_dir="/tmp/test_dir",
+        )
+
+        # Verify processor called
+        mock_processor.assert_called_once()
+
+        # Test with is_image=True
+        mock_blob_storage.download_blob.reset_mock()
+
+        with patch("builtins.open", mock_open()) as _:
+            result = await _blob_storage_process_setics_file(
+                "setics_document.json", "/tmp/test_dir", is_image=True
+            )
+
+        # For image data, we should not call the processor
+        chunks, ids, metadata = result
+        assert "document_type" in chunks[0].metadata
+        assert chunks[0].metadata["document_type"] == "web_setics"
+        assert ids == ["setics-doc-12345", "setics-doc-67890"]
+
+    @pytest.mark.asyncio
+    @patch("src.routes.documents_router._blob_storage_process_setics_file")
+    @patch("src.routes.documents_router.ChromaStore")
+    @patch("src.routes.documents_router.tempfile.mkdtemp")
+    @patch("src.routes.documents_router.os.path.exists")
+    @patch("src.routes.documents_router.shutil.rmtree")
+    async def test_add_setics_documents_success(
+        self,
+        mock_rmtree,
+        mock_exists,
+        mock_mkdtemp,
+        mock_chroma_store_class,
+        mock_process_setics,
+        test_client,
+        sample_chunks,
+        sample_chunk_ids,
+        sample_setics_documents,
+        auth_headers,
+    ):
+        """Test successful Setics document addition"""
+        mock_mkdtemp.return_value = "/tmp/test_dir"
+        mock_exists.return_value = True
+        mock_process_setics.return_value = (
+            sample_chunks,
+            sample_chunk_ids,
+            sample_setics_documents[0].metadata,
+        )
+
+        mock_store = AsyncMock()
+        mock_store.add_documents.return_value = (2, 0, [])
+        mock_store.store_metadata = {
+            "nb_collections": 1,
+            "details": {"setics_documents": {"count": 2}},
+        }
+        mock_chroma_store_class.return_value = mock_store
+
+        with patch("fastapi.Depends", return_value=None):
+            response = test_client.post(
+                "/v1/documents/setics/add",
+                json={"blob_name": "setics_document.json", "is_image": False},
+                headers=auth_headers,
+            )
+
+        assert response.status_code == 200
+        response_data = response.json()
+        assert response_data["status"] == "success"
+        assert response_data["filename"] == "setics_document.json"
+        assert response_data["added_count"] == 2
+        assert response_data["skipped_count"] == 0
+
+        mock_store.add_documents.assert_called_once_with(
+            documents=sample_chunks,
+            ids=sample_chunk_ids,
+            collection_name=config.SETICS_COLLECTION,
+            skip_existing=False,
+            is_web=True,
+        )
+        mock_rmtree.assert_called_once_with("/tmp/test_dir")
+
+    @pytest.mark.asyncio
+    @patch("src.routes.documents_router._blob_storage_process_setics_file")
+    @patch("src.routes.documents_router.ChromaStore")
+    @patch("src.routes.documents_router.tempfile.mkdtemp")
+    @patch("src.routes.documents_router.os.path.exists")
+    @patch("src.routes.documents_router.shutil.rmtree")
+    async def test_update_setics_documents_success(
+        self,
+        mock_rmtree,
+        mock_exists,
+        mock_mkdtemp,
+        mock_chroma_store_class,
+        mock_process_setics,
+        test_client,
+        sample_chunks,
+        sample_chunk_ids,
+        sample_setics_documents,
+        auth_headers,
+    ):
+        """Test successful Setics document update"""
+        mock_mkdtemp.return_value = "/tmp/test_dir"
+        mock_exists.return_value = True
+        mock_process_setics.return_value = (
+            sample_chunks,
+            sample_chunk_ids,
+            sample_setics_documents[0].metadata,
+        )
+
+        mock_store = AsyncMock()
+        mock_store.replace_documents.return_value = (2, 3, 1)
+        mock_store.store_metadata = {
+            "nb_collections": 1,
+            "details": {"setics_documents": {"count": 2}},
+        }
+        mock_chroma_store_class.return_value = mock_store
+
+        with patch("fastapi.Depends", return_value=None):
+            response = test_client.post(
+                "/v1/documents/setics/update",
+                json={"blob_name": "setics_document.json", "is_image": False},
+                headers=auth_headers,
+            )
+
+        assert response.status_code == 200
+        response_data = response.json()
+        assert response_data["status"] == "success"
+        assert response_data["filename"] == "setics_document.json"
+        assert response_data["added_count"] == 2
+        assert response_data["docs_replaced"] == 3
+        assert response_data["sources_updated"] == 1
+
+        mock_store.replace_documents.assert_called_once_with(
+            documents=sample_chunks,
+            ids=sample_chunk_ids,
+            collection_name=config.SETICS_COLLECTION,
+            is_web=True,
+        )
+        mock_rmtree.assert_called_once_with("/tmp/test_dir")
+
+    @pytest.mark.asyncio
+    @patch("src.routes.documents_router._blob_storage_process_setics_file")
+    @patch("src.routes.documents_router.ChromaStore")
+    @patch("src.routes.documents_router.tempfile.mkdtemp")
+    @patch("src.routes.documents_router.os.path.exists")
+    @patch("src.routes.documents_router.shutil.rmtree")
+    async def test_add_setics_documents_error_handling(
+        self,
+        mock_rmtree,
+        mock_exists,
+        mock_mkdtemp,
+        mock_chroma_store_class,
+        mock_process_setics,
+        test_client,
+        auth_headers,
+    ):
+        """Test error handling in add_setics_documents"""
+        mock_mkdtemp.return_value = "/tmp/test_dir"
+        mock_exists.return_value = True
+
+        mock_process_setics.side_effect = Exception("Setics processing failed")
+
+        with patch("fastapi.Depends", return_value=None):
+            response = test_client.post(
+                "/v1/documents/setics/add",
+                json={"blob_name": "setics_document.json"},
+                headers=auth_headers,
+            )
+        assert response.status_code == 503
+        assert "Setics processing failed" in response.json()["detail"]
+        mock_rmtree.assert_called_once_with("/tmp/test_dir")
+
+    @pytest.mark.asyncio
+    @patch("src.routes.documents_router._blob_storage_process_setics_file")
+    @patch("src.routes.documents_router.ChromaStore")
+    @patch("src.routes.documents_router.tempfile.mkdtemp")
+    @patch("src.routes.documents_router.os.path.exists")
+    @patch("src.routes.documents_router.shutil.rmtree")
+    async def test_update_setics_documents_error_handling(
+        self,
+        mock_rmtree,
+        mock_exists,
+        mock_mkdtemp,
+        mock_chroma_store_class,
+        mock_process_setics,
+        test_client,
+        sample_chunks,
+        sample_chunk_ids,
+        sample_setics_documents,
+        auth_headers,
+    ):
+        """Test error handling in update_setics_documents"""
+        mock_mkdtemp.return_value = "/tmp/test_dir"
+        mock_exists.return_value = True
+        mock_process_setics.return_value = (
+            sample_chunks,
+            sample_chunk_ids,
+            sample_setics_documents[0].metadata,
+        )
+
+        mock_store = AsyncMock()
+        mock_store.replace_documents.side_effect = Exception("Vector store error")
+        mock_chroma_store_class.return_value = mock_store
+
+        with patch("fastapi.Depends", return_value=None):
+            response = test_client.post(
+                "/v1/documents/setics/update",
+                json={"blob_name": "setics_document.json"},
+                headers=auth_headers,
+            )
+        assert response.status_code == 503
+        assert "Vector store error" in response.json()["detail"]
+        mock_rmtree.assert_called_once_with("/tmp/test_dir")

@@ -53,7 +53,9 @@ class MultiQRerankedRetriever:
         base_retriever = await chroma_retriever(collection_name=collection_name)
 
         # Create a compressor for reranking results
-        compressor = FlashrankRerank(top_n=top_n)
+        compressor = FlashrankRerank(model="ms-marco-MiniLM-L-12-v2", top_n=top_n)
+        # default model: ms-marco-TinyBERT-L-2-v2
+        # best cross-encoder model: ms-marco-MiniLM-L-12-v2
 
         # Use MultiQueryRetriever to generate multiple search queries from the original query
         multi_query_retriever = MultiQueryRetriever.from_llm(

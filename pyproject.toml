@@ -1,6 +1,6 @@
 [project]
 name = "fastapi-ai-tools"
-version = "0.3.6"
+version = "0.4.2"
 description = "AI & RAG backend tools"
 authors = [{ name = "jayseregon", email = "jayseregon@gmail.com" }]
 license = { text = "LGPL-3.0-or-later" }
@@ -29,18 +29,17 @@ dependencies = [
     "pytest-mock",
     "pytest-asyncio",
     "neo4j",
-    "chromadb",
     "langchain-community",
     "beautifulsoup4",
     "pypdf",
-    "langchain-openai (>=0.3.8,<0.4.0)",
-    "pymupdf (>=1.25.3,<2.0.0)",
-    "tqdm (>=4.67.1,<5.0.0)",
-    "langchain (>=0.3.22,<0.4.0)",
-    "langchain-chroma (>=0.2.2,<0.3.0)",
-    "flashrank (>=0.2.10,<0.3.0)",
-    "brotli (>=1.1.0,<2.0.0)",
-    "azure-storage-blob (>=12.25.1,<13.0.0)",
+    "langchain-openai",
+    "pymupdf",
+    "tqdm",
+    "langchain",
+    "langchain-chroma",
+    "brotli",
+    "azure-storage-blob",
+    "flashrank",
 ]
 
 [tool.poetry.group.dev.dependencies]
@@ -58,7 +57,7 @@ package-mode = false
 profile = "black"
 
 [tool.black]
-target-version = ["py312"]
+target-version = ["py313"]
 
 [tool.ruff]
 # Enable Pyflakes `E` and `F` codes by default.

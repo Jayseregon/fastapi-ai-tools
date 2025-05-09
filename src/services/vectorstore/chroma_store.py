@@ -107,6 +107,182 @@ class ChromaStore:
             embedding_function=self.embedding_function,
         )
 
+    def _is_web_source(self, source: str) -> bool:
+        """
+        Determine if a source is a web URL based on prefix.
+
+        Args:
+            source: Source path or URL to check
+
+        Returns:
+            bool: True if the source appears to be a web URL
+        """
+        return source.startswith(("http://", "https://"))
+
+    async def _get_source_tracker_auto(self, collection_name: str) -> Set[str]:
+        """
+        Get set of sources already stored in a collection with automatic
+        web/file detection for each source individually.
+
+        Args:
+            collection_name: Name of the collection to check
+
+        Returns:
+            Set of document sources already stored in the collection
+        """
+        logger.debug(f"Getting source tracker for collection: '{collection_name}'")
+        collection = await self._get_collection(collection_name)
+
+        # Get all metadata
+        # Paginate to handle large collections
+        sources = set()
+        limit = 1000  # Fetch in batches
+        offset = 0
+
+        while True:
+            logger.debug(f"Fetching metadata batch: limit={limit}, offset={offset}")
+            # Get a batch of records with their metadata
+            results = await asyncio.to_thread(
+                collection.get, include=["metadatas"], limit=limit, offset=offset
+            )
+
+            # Break if no more records
+            if (
+                not results
+                or not results["metadatas"]
+                or len(results["metadatas"]) == 0
+            ):
+                logger.debug("No more metadata records found")
+                break
+
+            # Process this batch of metadatas
+            batch_sources = 0
+            for metadata in results["metadatas"]:
+                if metadata and "source" in metadata:
+                    # Extract source path or URL
+                    source_path = metadata["source"]
+
+                    # Determine source type and extract appropriate identifier
+                    if self._is_web_source(source_path):
+                        # For web URLs, use the full URL
+                        source_identifier = source_path
+                    else:
+                        # For file paths, extract just the filename
+                        source_identifier = os.path.basename(source_path)
+
+                    sources.add(source_identifier)
+                    batch_sources += 1
+
+            logger.debug(f"Processed batch with {batch_sources} sources found")
+
+            # If we got fewer results than the limit, we're done
+            if len(results["metadatas"]) < limit:
+                logger.debug("Reached end of collection metadata")
+                break
+
+            # Otherwise continue with next batch
+            offset += limit
+            logger.debug(f"Moving to next batch, offset={offset}")
+
+        logger.debug(f"Found {len(sources)} unique document sources in collection")
+        return sources
+
+    async def get_collections_with_sources(self) -> Dict[str, List[str]]:
+        """
+        Get all collections with their unique document sources.
+        Automatically detects whether each source is a web URL or file path.
+
+        Returns:
+            Dict mapping collection names to lists of their unique document sources
+        """
+        logger.debug("Retrieving all collections with their sources")
+        collections: List[str] = self.client.list_collections()
+        result: Dict[str, List[str]] = {}
+
+        for collection_name in collections:
+            logger.debug(f"Getting sources for collection: '{collection_name}'")
+            try:
+                # Use the new auto-detection method instead
+                sources = await self._get_source_tracker_auto(collection_name)
+                result[collection_name] = sorted(list(sources))
+                logger.debug(f"Found {len(sources)} sources in '{collection_name}'")
+            except Exception as e:
+                logger.error(
+                    f"Error getting sources for collection '{collection_name}': {str(e)}"
+                )
+                result[collection_name] = []
+
+        logger.debug(f"Retrieved sources for {len(collections)} collections")
+        return result
+
+    async def delete_source_documents(
+        self, collection_name: str, source_name: str
+    ) -> int:
+        """
+        Delete all documents from a specific source in a collection.
+        Automatically detects whether the source is a web URL or file path.
+
+        Args:
+            collection_name: Name of the collection to delete from
+            source_name: Name of the source (filename or URL) to delete
+
+        Returns:
+            int: Number of documents deleted
+
+        Raises:
+            Exception: If collection doesn't exist or other operation errors
+        """
+        logger.debug(
+            f"Deleting documents from source '{source_name}' in collection '{collection_name}'"
+        )
+
+        # Get the collection
+        collection = await self._get_collection(collection_name)
+
+        # Get all documents and their metadata
+        results = await asyncio.to_thread(collection.get, include=["metadatas"])
+
+        if not results or not results["ids"] or not results["metadatas"]:
+            logger.warning(f"No documents found in collection '{collection_name}'")
+            return 0
+
+        # Determine if source_name looks like a URL
+        is_web_source = self._is_web_source(source_name)
+
+        # Filter documents with matching source
+        docs_to_delete = []
+        for i, metadata in enumerate(results["metadatas"]):
+            if metadata and "source" in metadata:
+                doc_source = metadata["source"]
+
+                # Check if the document source matches what we're looking for
+                if is_web_source:
+                    # For web URLs, compare the full URLs
+                    if doc_source == source_name:
+                        docs_to_delete.append(results["ids"][i])
+                else:
+                    # For file paths, compare just the filenames
+                    doc_source_basename = os.path.basename(doc_source)
+                    if doc_source_basename == source_name:
+                        docs_to_delete.append(results["ids"][i])
+
+        if not docs_to_delete:
+            logger.warning(
+                f"No documents found for source '{source_name}' in collection '{collection_name}'"
+            )
+            return 0
+
+        # Delete chunks with this source
+        logger.debug(
+            f"Deleting {len(docs_to_delete)} documents from source '{source_name}'"
+        )
+        await asyncio.to_thread(collection.delete, ids=docs_to_delete)
+        logger.debug(
+            f"Successfully deleted {len(docs_to_delete)} documents from source '{source_name}'"
+        )
+
+        return len(docs_to_delete)
+
     async def _get_source_tracker(
         self, collection_name: str, is_web: bool = False
     ) -> Set[str]:
